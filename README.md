@@ -59,7 +59,7 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 
 # App
-PORT=3000
+PORT=3001
 LOG_LEVEL=info                   # debug | info | warn | error
 
 # Idempotência
@@ -74,7 +74,7 @@ RATE_LIMIT_REFILL_RATE=120       # req/min (÷60 = 2 req/s)
 
 Dois processos separados devem ser iniciados:
 
-**Terminal 1 — Webhook receiver (porta 3000):**
+**Terminal 1 — Webhook receiver (porta 3001):**
 ```bash
 npm run dev       # desenvolvimento com hot reload
 # npm start       # produção

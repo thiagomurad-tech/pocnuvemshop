@@ -9,7 +9,7 @@ Stock-sync middleware for Fashion Corp: SAP ERP sends up to 500 webhook req/s â†
 ## Commands
 
 ```bash
-# Start webhook receiver (port 3000)
+# Start webhook receiver (port 3001)
 npm run dev          # with hot reload (nodemon)
 npm start            # production
 
@@ -74,7 +74,7 @@ NUVEMSHOP_STORE_ID=123456
 NUVEMSHOP_ACCESS_TOKEN=seu_access_token_aqui
 REDIS_HOST=localhost
 REDIS_PORT=6379
-PORT=3000
+PORT=3001
 LOG_LEVEL=info                  # debug | info | warn | error
 IDEMPOTENCY_TTL_SECONDS=300     # dedup window (5 min default)
 RATE_LIMIT_MAX_TOKENS=100       # token bucket capacity

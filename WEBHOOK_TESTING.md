@@ -8,14 +8,14 @@ npm start
 npm run dev
 ```
 
-O serviço estará disponível em: `http://localhost:3000`
+O serviço estará disponível em: `http://localhost:3001`
 
 ## 1️⃣ Teste com `curl`
 
 ### Requisição válida (202 Accepted)
 
 ```bash
-curl -X POST http://localhost:3000/webhook/stock \
+curl -X POST http://localhost:3001/webhook/stock \
   -H "Content-Type: application/json" \
   -d '{
     "sku_code": "TSHIRT-XL",
@@ -36,7 +36,7 @@ curl -X POST http://localhost:3000/webhook/stock \
 ### Requisição com campos faltando (400 Bad Request)
 
 ```bash
-curl -X POST http://localhost:3000/webhook/stock \
+curl -X POST http://localhost:3001/webhook/stock \
   -H "Content-Type: application/json" \
   -d '{
     "sku_code": "TSHIRT-XL"
@@ -60,7 +60,7 @@ const payload = {
   stock: 100
 };
 
-const response = await fetch('http://localhost:3000/webhook/stock', {
+const response = await fetch('http://localhost:3001/webhook/stock', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -80,13 +80,32 @@ if (response.status === 202) {
 ## 3️⃣ Health Check
 
 ```bash
-curl http://localhost:3000/health
+# Liveness básico
+curl http://localhost:3001/health
+
+# Estado da fila (waiting / active / delayed / failed)
+curl http://localhost:3001/health/queue
 ```
 
-**Resposta:**
+**Resposta `/health`:**
+```json
+{ "status": "ok" }
+```
+
+**Resposta `/health/queue`:**
 ```json
 {
-  "status": "ok"
+  "status": "healthy",
+  "queue": {
+    "name": "stock-updates",
+    "waiting": 0,
+    "active": 1,
+    "delayed": 0,
+    "failed": 0,
+    "completed": 42
+  },
+  "alerts": [],
+  "timestamp": "2026-05-25T22:00:00.000Z"
 }
 ```
 
@@ -97,7 +116,7 @@ curl http://localhost:3000/health
 Se você enviar um JSON malformado (ex: falta de aspas ou chaves):
 
 ```bash
-curl -X POST http://localhost:3000/webhook/stock \
+curl -X POST http://localhost:3001/webhook/stock \
   -H "Content-Type: application/json" \
   -d '{"sku_code": "TEST"}}}' # ❌ Malformado
 ```
@@ -112,7 +131,7 @@ curl -X POST http://localhost:3000/webhook/stock \
 ### Erro: stock é null
 
 ```bash
-curl -X POST http://localhost:3000/webhook/stock \
+curl -X POST http://localhost:3001/webhook/stock \
   -H "Content-Type: application/json" \
   -d '{
     "sku_code": "TSHIRT-XL",
@@ -148,3 +167,4 @@ Todos os cenários estão cobertos em `tests/integration/webhook.test.js`:
 - ✅ Stock = 0 (edge case) → 202 Accepted
 - ✅ Payloads grandes → 202 Accepted
 - ✅ Health check → 200 OK
+- ✅ Health da fila → 200 OK com contagens BullMQ

@@ -129,7 +129,7 @@ app.get('/health/queue', async (_req, res) => {
 
 // Inicia o servidor apenas se for o entry point (não quando importado para testes)
 if (require.main === module) {
-  const PORT = parseInt(process.env.PORT || '3000', 10);
+  const PORT = parseInt(process.env.PORT || '3001', 10);
   app.listen(PORT, () => logger.info({ msg: 'Webhook receiver iniciado', port: PORT }));
 }
 
