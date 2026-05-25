@@ -43,11 +43,11 @@ describe('WorkerRateLimiterIntegration', () => {
     const skuCode = 'TSHIRT-XL';
     const qty = 100;
     const S = 'store-123', P = 'proc-456', V = 'var-789';
-    const PATH = `/2025-03/${S}/products/${P}/variants/${V}`;
+    const PATH = `/2025-03/${S}/products/${P}/variants/stock`;
 
     // Setup nock
     nock('https://api.nuvemshop.com.br')
-      .put(PATH, { stock: qty, stock_management: true })
+      .post(PATH, { action: 'replace', stock: qty, id: V })
       .reply(200, { id: parseInt(V), sku: skuCode, stock: qty }, { 'x-rate-limit-remaining': '85' });
 
     // 1. Verificar se é duplicata

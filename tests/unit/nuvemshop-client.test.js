@@ -242,7 +242,7 @@ describe('NuvemshopClient', () => {
     }
   });
 
-  test('updateStockPrice valida máximo de 50 variantes', () => {
+  test('updateStockPrice valida máximo de 50 variantes', async () => {
     const updates = [
       {
         id: 1,
@@ -250,7 +250,7 @@ describe('NuvemshopClient', () => {
       },
     ];
 
-    expect(() => client.updateStockPrice(updates)).toThrow(/máximo 50 variantes/i);
+    await expect(client.updateStockPrice(updates)).rejects.toThrow(/máximo 50 variantes/i);
   });
 
   test('updateStockPrice com múltiplos produtos é permitido', async () => {

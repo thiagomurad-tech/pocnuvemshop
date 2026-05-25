@@ -19,20 +19,20 @@ afterEach(() => {
 });
 
 const S = 'test-store', T = 'test-token', P = '1001', V = '2001', SKU = 'TSHIRT-M-RED', QTY = 150;
-const PATH = `/2025-03/${S}/products/${P}/variants/${V}`;
+const PATH  = `/2025-03/${S}/products/${P}/variants/stock`;
+const BODY  = { action: 'replace', stock: QTY, id: V };
 
 describe('Fluxo de atualização de estoque', () => {
   let redis;
   beforeEach(() => { redis = new RedisMock(); });
   afterEach(async () => { await redis.flushall(); });
 
-  test('evento novo: idempotência passa e API é chamada', async () => {
-    nock('https://api.nuvemshop.com.br').put(PATH, { stock: QTY, stock_management: true })
+  test('evento novo: idempotência passa e API é chamada via POST /variants/stock', async () => {
+    nock('https://api.nuvemshop.com.br').post(PATH, BODY)
       .reply(200, { id: parseInt(V), sku: SKU, stock: QTY }, { 'x-rate-limit-remaining': '100' });
 
     expect(await isDuplicate(redis, SKU, QTY)).toBe(false);
-    const p = updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: QTY, skuCode: SKU });
-    const result = await p;
+    const result = await updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: QTY, skuCode: SKU });
     expect(result.data.stock).toBe(QTY);
     expect(result.headers.rateLimitRemaining).toBe(100);
     expect(nock.isDone()).toBe(true);
@@ -45,17 +45,15 @@ describe('Fluxo de atualização de estoque', () => {
   });
 
   test('429 → backoff → sucesso na segunda chamada', async () => {
-    // Mock sleep para testes rodar rápido
     const originalSleep = nuvemshop.sleep;
     nuvemshop.sleep = jest.fn().mockResolvedValue(undefined);
 
     nock('https://api.nuvemshop.com.br')
-      .put(PATH).reply(429, '', { 'x-rate-limit-reset': '500' })
-      .put(PATH).reply(200, { id: parseInt(V), stock: QTY }, { 'x-rate-limit-remaining': '99' });
+      .post(PATH).reply(429, '', { 'x-rate-limit-reset': '500' })
+      .post(PATH).reply(200, { id: parseInt(V), stock: QTY }, { 'x-rate-limit-remaining': '99' });
 
     expect(await isDuplicate(redis, SKU, QTY)).toBe(false);
-    const p = updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: QTY, skuCode: SKU });
-    const result = await p;
+    const result = await updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: QTY, skuCode: SKU });
     expect(result.data.stock).toBe(QTY);
     expect(result.headers.rateLimitRemaining).toBe(99);
     expect(nock.isDone()).toBe(true);
@@ -64,15 +62,13 @@ describe('Fluxo de atualização de estoque', () => {
   });
 
   test('segundo evento com estoque diferente aciona nova chamada à API', async () => {
-    nock('https://api.nuvemshop.com.br').put(PATH).reply(200, { id: parseInt(V), stock: 50 }, { 'x-rate-limit-remaining': '100' });
+    nock('https://api.nuvemshop.com.br').post(PATH).reply(200, { id: parseInt(V), stock: 50 }, { 'x-rate-limit-remaining': '100' });
     await isDuplicate(redis, SKU, 50);
-    const p1 = updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: 50, skuCode: SKU });
-    await p1;
+    await updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: 50, skuCode: SKU });
 
-    nock('https://api.nuvemshop.com.br').put(PATH).reply(200, { id: parseInt(V), stock: 75 }, { 'x-rate-limit-remaining': '99' });
+    nock('https://api.nuvemshop.com.br').post(PATH).reply(200, { id: parseInt(V), stock: 75 }, { 'x-rate-limit-remaining': '99' });
     expect(await isDuplicate(redis, SKU, 75)).toBe(false);
-    const p2 = updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: 75, skuCode: SKU });
-    const result = await p2;
+    const result = await updateVariantStock({ storeId: S, accessToken: T, productId: P, variantId: V, stock: 75, skuCode: SKU });
     expect(result.data.stock).toBe(75);
     expect(result.headers.rateLimitRemaining).toBe(99);
     expect(nock.isDone()).toBe(true);

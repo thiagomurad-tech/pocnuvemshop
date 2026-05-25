@@ -140,7 +140,7 @@ class NuvemshopClient {
           continue;
         }
 
-        // 4xx (exceto 429): Erro cliente - não retry
+        // 4xx (exceto 429): Erro cliente - não retenta
         if (response.status >= 400 && response.status < 500) {
           const errorBody = await response.text();
           logger.error({
@@ -151,7 +151,10 @@ class NuvemshopClient {
             ...this.ctx,
           });
 
-          throw new Error(`Nuvemshop: ${response.status} - ${errorBody.substring(0, 200)}`);
+          const clientErr = new Error(`Nuvemshop: ${response.status} - ${errorBody.substring(0, 200)}`);
+          clientErr.statusCode = response.status;
+          clientErr.isClientError = true;
+          throw clientErr;
         }
 
         // 2xx e 3xx: Sucesso
@@ -174,9 +177,12 @@ class NuvemshopClient {
           },
         };
       } catch (err) {
+        // Erros de cliente (4xx) não devem ser retentados
+        if (err.isClientError) throw err;
+
         lastError = err;
 
-        // Erro de rede ou JSON parse - tenta retry
+        // Erros de rede ou parse — tenta retry
         if (attempt < this.maxRetries) {
           const delay = this._computeDelay(attempt);
           logger.warn({

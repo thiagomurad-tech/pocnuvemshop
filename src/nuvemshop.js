@@ -35,7 +35,7 @@ function computeDelay(attempt, rateLimitResetMs) {
 }
 
 async function updateVariantStock({ storeId, productId, variantId, stock, accessToken, skuCode }) {
-  const url = `${BASE_URL}/${API_VERSION}/${storeId}/products/${productId}/variants/${variantId}`;
+  const url = `${BASE_URL}/${API_VERSION}/${storeId}/products/${productId}/variants/stock`;
   const ctx = { skuCode, productId, variantId, stock };
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -44,13 +44,13 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
     let res;
     try {
       res = await fetch(url, {
-        method:  'PUT',
+        method:  'POST',
         headers: {
           authentication: `bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'User-Agent':   USER_AGENT,
         },
-        body: JSON.stringify({ stock, stock_management: true }),
+        body: JSON.stringify({ action: 'replace', stock, id: variantId }),
       });
     } catch (networkErr) {
       logger.error({ msg: 'Falha de rede', err: networkErr.message, attempt, ...ctx });
