@@ -43,10 +43,25 @@ app.post('/webhook/stock', async (req, res) => {
       variantId: variant_id,
       stock:     Number(stock),
     });
-    logger.info({ msg: 'Webhook enfileirado', jobId: job.id, skuCode: sku_code, stock });
+    logger.info({
+      msg:       'Webhook enfileirado',
+      jobId:     job.id,
+      skuCode:   sku_code,
+      productId: product_id,
+      variantId: variant_id,
+      stock,
+      queue:     'stock-updates',
+    });
     return res.status(202).json({ jobId: job.id, status: 'queued' });
   } catch (err) {
-    logger.error({ msg: 'Erro ao enfileirar', err: err.message, body: req.body });
+    logger.error({
+      msg:       'Erro ao enfileirar webhook',
+      err:       err.message,
+      skuCode:   sku_code,
+      productId: product_id,
+      variantId: variant_id,
+      stock,
+    });
     return res.status(500).json({ error: 'Erro interno ao enfileirar atualização' });
   }
 });

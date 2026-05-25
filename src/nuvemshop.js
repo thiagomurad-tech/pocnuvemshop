@@ -36,10 +36,10 @@ function computeDelay(attempt, rateLimitResetMs) {
 
 async function updateVariantStock({ storeId, productId, variantId, stock, accessToken, skuCode }) {
   const url = `${BASE_URL}/${API_VERSION}/${storeId}/products/${productId}/variants/stock`;
-  const ctx = { skuCode, productId, variantId, stock };
+  const ctx = { skuCode, productId, variantId, stock, endpoint: url };
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    logger.info({ msg: 'Enviando atualização de estoque', attempt, ...ctx });
+    logger.info({ msg: 'Enviando atualização de estoque', attempt, max_retries: MAX_RETRIES, ...ctx });
 
     let res;
     try {
@@ -53,50 +53,93 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
         body: JSON.stringify({ action: 'replace', stock, id: variantId }),
       });
     } catch (networkErr) {
-      logger.error({ msg: 'Falha de rede', err: networkErr.message, attempt, ...ctx });
+      logger.error({
+        msg:       'Falha de rede ao chamar Nuvemshop',
+        err:       networkErr.message,
+        err_stack: networkErr.stack,
+        attempt,
+        max_retries: MAX_RETRIES,
+        ...ctx,
+      });
       if (attempt >= MAX_RETRIES) throw networkErr;
-      await sleep(computeDelay(attempt, 0));
+      const wait_ms = computeDelay(attempt, 0);
+      await sleep(wait_ms);
       continue;
     }
 
     const rateLimitRemaining = parseInt(res.headers.get('x-rate-limit-remaining') ?? '-1', 10);
     const rateLimitResetMs   = parseInt(res.headers.get('x-rate-limit-reset')     ?? '0',  10);
 
-    logger.debug({ msg: 'Resposta Nuvemshop', status: res.status, rateLimitRemaining, rateLimitResetMs, attempt, ...ctx });
+    logger.debug({
+      msg: 'Resposta Nuvemshop recebida',
+      status:               res.status,
+      rate_limit_remaining: rateLimitRemaining,
+      rate_limit_reset_ms:  rateLimitResetMs,
+      attempt,
+      ...ctx,
+    });
 
     if (res.ok) {
       const data = await res.json();
-      logger.info({ msg: 'Estoque atualizado com sucesso', newStock: data.stock, ...ctx });
+      logger.info({
+        msg:                  'Estoque atualizado com sucesso',
+        new_stock:            data.stock,
+        rate_limit_remaining: rateLimitRemaining,
+        ...ctx,
+      });
       return {
         data,
-        headers: {
-          rateLimitRemaining,
-          rateLimitResetMs,
-        },
+        headers: { rateLimitRemaining, rateLimitResetMs },
       };
     }
 
     if (res.status === 429) {
       if (attempt >= MAX_RETRIES) break;
-      const delay = computeDelay(attempt, rateLimitResetMs);
-      logger.warn({ msg: 'Rate limit (429), aguardando', delay, attempt, ...ctx });
-      await sleep(delay);
+      const wait_ms = computeDelay(attempt, rateLimitResetMs);
+      logger.warn({
+        msg:                 'Rate limit atingido (429) — aguardando antes de retentar',
+        wait_ms,
+        attempt,
+        rate_limit_reset_ms: rateLimitResetMs,
+        next_attempt:        attempt + 1,
+        max_retries:         MAX_RETRIES,
+        ...ctx,
+      });
+      await sleep(wait_ms);
       continue;
     }
 
     if (res.status >= 500) {
       if (attempt >= MAX_RETRIES) break;
-      const delay = computeDelay(attempt, 0);
-      logger.warn({ msg: 'Erro servidor, retentando', status: res.status, delay, attempt, ...ctx });
-      await sleep(delay);
+      const wait_ms = computeDelay(attempt, 0);
+      logger.warn({
+        msg:          'Erro no servidor Nuvemshop (5xx) — retentando',
+        status:       res.status,
+        wait_ms,
+        attempt,
+        next_attempt: attempt + 1,
+        max_retries:  MAX_RETRIES,
+        ...ctx,
+      });
+      await sleep(wait_ms);
       continue;
     }
 
     const body = await res.text();
-    logger.error({ msg: 'Erro não-retentável', status: res.status, body, ...ctx });
+    logger.error({
+      msg:    'Erro não-retentável na API Nuvemshop',
+      status: res.status,
+      body,
+      ...ctx,
+    });
     throw new NuvemshopApiError(`Erro ${res.status}`, res.status, body);
   }
 
+  logger.error({
+    msg:         'Máximo de tentativas atingido — job será enviado para DLQ',
+    max_retries: MAX_RETRIES,
+    ...ctx,
+  });
   throw new MaxRetriesExceededError(MAX_RETRIES + 1);
 }
 
