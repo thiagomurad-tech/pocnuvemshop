@@ -1,24 +1,23 @@
-# Fashion Corp Middleware — pco-nuvemshop
+# pco-nuvemshop — Middleware de Estoque SAP → Nuvemshop
 
-Middleware de sincronização de estoque entre o SAP ERP da Fashion Corp
-e a plataforma Nuvemshop Next.
+Middleware de sincronização de estoque entre o SAP ERP da Fashion Corp e a plataforma Nuvemshop Next.
 
 ## Contexto
 
-O SAP envia webhooks de estoque sem controle de vazão (até 500 req/s).
-Este middleware absorve os picos, elimina duplicatas e entrega as
-atualizações à Nuvemshop respeitando o rate limit da plataforma
-(bucket de 40 req, 2 req/s).
+O SAP envia webhooks de estoque sem controle de vazão (até 500 req/s).  
+Este middleware absorve os picos, elimina duplicatas e entrega as atualizações à Nuvemshop respeitando o rate limit da plataforma (bucket de 40 req, 2 req/s).
 
-## Arquitetura (5 componentes)
+## Arquitetura
 
 ```
 SAP ERP (500 req/s)
-  └─► Webhook Gateway       ← recebe tudo, responde 202
-        └─► Redis unificado  ← fila (Streams) + cache de idempotência (SETEX)
-              └─► Consumer Workers (concorrência = rate control embutido)
-                    └─► Nuvemshop API   (PUT /products/:id/variants/:id)
-                    └─► Dead Letter Queue (jobs falhos = DLQ nativa do BullMQ)
+  └─► src/app.js          Express — recebe webhook, valida payload, responde 202
+        └─► Redis (BullMQ) ← fila de jobs + cache de idempotência (SETEX)
+              └─► src/worker.js   Consome fila (concorrência=10)
+                    ├─► Idempotência   SHA-256(sku:stock) — descarta duplicatas
+                    ├─► Rate Limiter   Token Bucket — sincroniza com x-rate-limit-remaining
+                    └─► src/nuvemshop.js → POST /products/:id/variants/stock
+                          └─► DLQ   Jobs falhos após 5 tentativas (BullMQ nativo)
 ```
 
 ## Pré-requisitos
@@ -29,28 +28,20 @@ SAP ERP (500 req/s)
 | Redis       | 6.0           |
 | npm         | 8.x           |
 
-### Instalar Redis localmente (macOS)
 ```bash
-brew install redis
-brew services start redis
-```
+# macOS
+brew install redis && brew services start redis
 
-### Instalar Redis localmente (Ubuntu/Debian)
-```bash
-sudo apt update && sudo apt install redis-server
-sudo systemctl start redis
+# Ubuntu/Debian
+sudo apt update && sudo apt install redis-server && sudo systemctl start redis
 ```
 
 ## Instalação
 
 ```bash
-# 1. Clonar / entrar na pasta
-cd ~/Documentos/projetos/pco-nuvemshop
-
-# 2. Instalar dependências
+git clone https://github.com/thiagomurad-tech/pocnuvemshop.git
+cd pocnuvemshop
 npm install
-
-# 3. Configurar variáveis de ambiente
 cp .env.example .env
 # Editar .env com suas credenciais Nuvemshop
 ```
@@ -58,100 +49,143 @@ cp .env.example .env
 ## Configuração (.env)
 
 ```dotenv
-NUVEMSHOP_STORE_ID=123456          # ID da loja na Nuvemshop
-NUVEMSHOP_ACCESS_TOKEN=seu_token   # Token OAuth2 da loja
+# Nuvemshop
+NUVEMSHOP_STORE_ID=<seu_store_id>
+NUVEMSHOP_ACCESS_TOKEN=<seu_access_token>
+NUVEMSHOP_API_BASE_URL=https://api.nuvemshop.com.br/2025-03
+
+# Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
+
+# App
 PORT=3000
-LOG_LEVEL=info
-IDEMPOTENCY_TTL_SECONDS=300
+LOG_LEVEL=info                   # debug | info | warn | error
+
+# Idempotência
+IDEMPOTENCY_TTL_SECONDS=300      # janela de dedup (5 min)
+
+# Rate limiter — Leaky Bucket Nuvemshop
+RATE_LIMIT_MAX_TOKENS=40         # capacidade do bucket
+RATE_LIMIT_REFILL_RATE=120       # req/min (÷60 = 2 req/s)
 ```
 
 ## Como rodar
 
-### Modo desenvolvimento (dois terminais)
+Dois processos separados devem ser iniciados:
 
-**Terminal 1 — Webhook receiver:**
+**Terminal 1 — Webhook receiver (porta 3000):**
 ```bash
-npm run dev
-# Saída esperada:
-# {"msg":"Webhook receiver iniciado","port":3000}
+npm run dev       # desenvolvimento com hot reload
+# npm start       # produção
 ```
 
 **Terminal 2 — Worker:**
 ```bash
 npm run worker
-# Saída esperada:
-# {"msg":"Worker iniciado","queue":"stock-updates","concurrency":10}
 ```
 
-### Simular webhook do SAP
-```bash
-curl -X POST http://localhost:3000/webhook/stock \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sku_code":   "SKU-001",
-    "product_id": "456",
-    "variant_id": "789",
-    "stock":      42
-  }'
+## Endpoints
 
-# Resposta esperada:
-# {"jobId":"1","status":"queued"}
+### `POST /webhook/stock`
+
+Recebe evento de atualização de estoque do SAP.
+
+**Body:**
+```json
+{
+  "sku_code":   "SKU-POSTMAN-001",
+  "product_id": "346452988",
+  "variant_id": "1531149939",
+  "stock":      50
+}
 ```
 
-### Health check
-```bash
-curl http://localhost:3000/health
-# {"status":"ok"}
+**Resposta 202:**
+```json
+{ "jobId": "1", "status": "queued" }
+```
+
+**Resposta 400** (campos faltando):
+```json
+{ "error": "Campos obrigatórios: sku_code, product_id, variant_id, stock" }
+```
+
+### `GET /health`
+
+```json
+{ "status": "ok" }
 ```
 
 ## Testes
 
 ```bash
-# Todos os testes (unitários + integração)
+# Todos (unitários + integração) — sem Redis real, sem rede
 npm test
 
-# Apenas unitários (sem Redis, sem Nuvemshop real)
+# Apenas unitários
 npm run test:unit
 
-# Apenas integração (nock simula a API Nuvemshop)
+# Apenas integração
 npm run test:integration
+
+# Arquivo específico
+npx jest tests/unit/rateLimiter.test.js --runInBand
+
+# Padrão de nome
+npm test -- --testPathPattern="webhook"
 ```
 
-### Quando tiver conta Nuvemshop real
+### Testes E2E — API real Nuvemshop
 
-1. Crie um produto de teste e anote `product_id` e `variant_id`.
-2. Configure `.env` com as credenciais reais.
-3. Em `tests/integration/stock-update.test.js`, remova os blocos `nock.*`
-   e atualize as constantes `PRODUCT_ID` / `VARIANT_ID`.
-4. Execute `npm run test:integration`.
+Requer Redis local e credenciais reais no `.env`.
+
+```bash
+npm run test:e2e
+```
+
+Executa 4 cenários contra a API real:
+
+| Cenário | Descrição |
+|---------|-----------|
+| C1 | Atualizar estoque → 50 via POST /variants/stock + GET de confirmação |
+| C2 | Zerar estoque (stock=0) + GET de confirmação |
+| C3 | 5 atualizações sequenciais sem atingir rate limit |
+| C4 | Lookup de produto por SKU via GET /products/sku/:sku |
+
+Ao final gera artefatos de evidência em `reports/` (gitignored):
+- `evidence-<timestamp>.json` — payload, resposta e assertions por cenário
+- `evidence-<timestamp>.html` — relatório visual com detalhes colapsáveis
+
+## Quirks da API Nuvemshop
+
+| Item | Detalhe |
+|------|---------|
+| Autenticação | Header `Authentication: bearer <token>` — **não** `Authorization` |
+| Endpoint de estoque | `POST /2025-03/{store_id}/products/{product_id}/variants/stock` |
+| Body obrigatório | `{ "action": "replace", "value": <qty>, "id": "<variant_id>" }` |
+| Rate limit | bucket=40 req, drain=2 req/s |
+| Header de controle | `x-rate-limit-remaining` e `x-rate-limit-reset` (ms) |
+| User-Agent | Obrigatório — formato: `NomeDaApp (email@parceiro.com)` |
 
 ## Observabilidade
 
-Logs estruturados em JSON são gravados em:
+Logs em JSON gravados em:
 - `logs/combined.log` — todos os níveis
-- `logs/error.log`    — apenas erros
+- `logs/error.log` — apenas erros
 
-Métricas de alerta recomendadas (Grafana / Datadog):
+Campos fixos para filtro em dashboards:
 
-| Métrica                    | Threshold | Ação                     |
-|----------------------------|-----------|--------------------------|
-| Tamanho da fila (BullMQ)   | > 10.000  | Escalar workers          |
-| Lag de processamento       | > 5 min   | Investigar imediatamente |
-| Jobs na fila de falhas     | > 100     | Falha sistêmica          |
+| Campo | Quando aparece | Uso |
+|-------|----------------|-----|
+| `alert: "DLQ"` | Job esgotou tentativas | Alerta crítico |
+| `msg: "duplicata"` | Evento idempotente descartado | Métricas de dedup |
+| `msg: "back-pressure ativo"` | Fila do rate limiter > 0 | Alerta de saturação |
 
-## Endpoint da API Nuvemshop
+Thresholds recomendados:
 
-```
-PUT https://api.nuvemshop.com.br/2025-03/{store_id}/products/{product_id}/variants/{variant_id}
-```
-
-Body:
-```json
-{ "stock": 42, "stock_management": true }
-```
-
-Rate limit padrão: bucket de 40 req, vazão de 2 req/s.
-Planos Next/Evolution: multiplicador de 10x.
-Header de controle: `x-rate-limit-reset` (ms para esvaziar o bucket).
+| Métrica | Threshold | Ação |
+|---------|-----------|------|
+| Tamanho da fila BullMQ | > 10.000 | Escalar workers |
+| Lag de processamento | > 5 min | Investigar |
+| Jobs na DLQ | > 100 | Falha sistêmica |
