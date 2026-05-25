@@ -113,9 +113,66 @@ Recebe evento de atualização de estoque do SAP.
 
 ### `GET /health`
 
+Liveness check básico do processo.
+
 ```json
 { "status": "ok" }
 ```
+
+### `GET /health/queue`
+
+Estado detalhado da fila BullMQ. Use este endpoint em monitors de uptime (Grafana, Datadog, UptimeRobot) — retorna **HTTP 503** quando o status for `critical`, disparando alertas antes que o cliente perceba.
+
+**Resposta 200 — healthy:**
+```json
+{
+  "status": "healthy",
+  "queue": {
+    "name":      "stock-updates",
+    "waiting":   0,
+    "active":    2,
+    "delayed":   0,
+    "failed":    0,
+    "completed": 148
+  },
+  "thresholds": {
+    "waiting": { "warn": 1000, "critical": 10000 },
+    "failed":  { "warn": 10,   "critical": 100   }
+  },
+  "alerts": [],
+  "timestamp": "2026-05-25T22:00:45.462Z"
+}
+```
+
+**Resposta 503 — critical** (fila travada ou DLQ cheia):
+```json
+{
+  "status": "critical",
+  "queue": { "waiting": 15200, "failed": 130, ... },
+  "alerts": [
+    "fila crítica: 15200 jobs aguardando (limite: 10000)",
+    "DLQ crítica: 130 jobs com falha (limite: 100)"
+  ]
+}
+```
+
+**Campos da fila:**
+
+| Campo | Descrição |
+|-------|-----------|
+| `waiting` | Enfileirados, aguardando um worker livre |
+| `active` | Sendo processados agora |
+| `delayed` | Em backoff — aguardando retry após 429/5xx |
+| `failed` | Na DLQ — tentativas esgotadas, requer atenção |
+| `completed` | Concluídos na última hora |
+
+**Tabela de status:**
+
+| `status` | HTTP | Condição |
+|----------|------|----------|
+| `healthy` | 200 | Operação normal |
+| `degraded` | 200 | `waiting > 1.000` ou `failed > 10` |
+| `critical` | **503** | `waiting > 10.000` ou `failed > 100` |
 
 ## Testes
 
@@ -170,6 +227,8 @@ Ao final gera artefatos de evidência em `reports/` (gitignored):
 
 ## Observabilidade
 
+### Logs
+
 Logs em JSON gravados em:
 - `logs/combined.log` — todos os níveis
 - `logs/error.log` — apenas erros
@@ -181,11 +240,15 @@ Campos fixos para filtro em dashboards:
 | `alert: "DLQ"` | Job esgotou tentativas | Alerta crítico |
 | `msg: "duplicata"` | Evento idempotente descartado | Métricas de dedup |
 | `msg: "back-pressure ativo"` | Fila do rate limiter > 0 | Alerta de saturação |
+| `msg: "Job descartado"` | Erro 4xx não-retriável (ex: 404) | Produto inexistente na Nuvemshop |
 
-Thresholds recomendados:
+### Monitoramento ativo
 
-| Métrica | Threshold | Ação |
-|---------|-----------|------|
-| Tamanho da fila BullMQ | > 10.000 | Escalar workers |
-| Lag de processamento | > 5 min | Investigar |
-| Jobs na DLQ | > 100 | Falha sistêmica |
+Configure um monitor de uptime apontando para `GET /health/queue`. Quando a fila travar, o endpoint retorna HTTP 503 automaticamente — o monitor dispara o alerta sem necessidade de parsing de logs.
+
+Thresholds embutidos no endpoint:
+
+| Métrica | Degraded | Critical (→ 503) | Ação recomendada |
+|---------|----------|-------------------|------------------|
+| `waiting` (fila crescendo) | > 1.000 | > 10.000 | Escalar workers |
+| `failed` (DLQ) | > 10 | > 100 | Investigar erros, replay jobs |
