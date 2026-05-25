@@ -32,11 +32,11 @@ describe('WorkerRateLimiterIntegration', () => {
     const originalSleep = require('../../src/nuvemshop').sleep;
     require('../../src/nuvemshop').sleep = jest.fn().mockResolvedValue(undefined);
 
-    // Limiter com maxTokens = 100 (como em produção)
+    // Limiter com parâmetros reais da Nuvemshop: bucket=40, drain=2 req/s
     limiter.destroy();
     limiter = new TokenBucketRateLimiter({
-      maxTokens: 100,
-      refillRate: 100 / 60, // tokens/sec
+      maxTokens: 40,
+      refillRate: 2,  // 2 req/s
       refillInterval: 50,
     });
 
@@ -45,19 +45,19 @@ describe('WorkerRateLimiterIntegration', () => {
     const S = 'store-123', P = 'proc-456', V = 'var-789';
     const PATH = `/2025-03/${S}/products/${P}/variants/stock`;
 
-    // Setup nock
+    // Setup nock — retorna 32 remaining (dentro do bucket de 40)
     nock('https://api.nuvemshop.com.br')
       .post(PATH, { action: 'replace', stock: qty, id: V })
-      .reply(200, { id: parseInt(V), sku: skuCode, stock: qty }, { 'x-rate-limit-remaining': '85' });
+      .reply(200, { id: parseInt(V), sku: skuCode, stock: qty }, { 'x-rate-limit-remaining': '32' });
 
     // 1. Verificar se é duplicata
     const isDup1 = await isDuplicate(redis, skuCode, qty);
     expect(isDup1).toBe(false);
 
     // 2. Adquirir token do rate limiter
-    expect(limiter.getStatus().tokens).toBe(100); // Cheio
+    expect(limiter.getStatus().tokens).toBe(40); // Cheio (bucket=40)
     await limiter.acquire();
-    expect(limiter.getStatus().tokens).toBeCloseTo(99, 0.1); // Consumiu 1
+    expect(limiter.getStatus().tokens).toBeCloseTo(39, 0.1); // Consumiu 1
 
     // 3. Chamar API
     const result = await updateVariantStock({
@@ -69,12 +69,12 @@ describe('WorkerRateLimiterIntegration', () => {
       skuCode,
     });
 
-    // 4. Ajustar rate limiter com resposta
-    expect(result.headers.rateLimitRemaining).toBe(85);
+    // 4. Ajustar rate limiter com resposta da API
+    expect(result.headers.rateLimitRemaining).toBe(32);
     limiter.adjustCapacityFromHeader(result.headers.rateLimitRemaining);
-    // adjustCapacityFromHeader toma o mínimo(maxTokens, remainingFromAPI)
-    // Math.min(100, 85) = 85
-    expect(limiter.getStatus().tokens).toBe(85);
+    // adjustCapacityFromHeader aplica Math.min(maxTokens, remainingFromAPI)
+    // Math.min(40, 32) = 32
+    expect(limiter.getStatus().tokens).toBe(32);
 
     // 5. Verificar duplicata novamente (deve ser duplicata agora)
     const isDup2 = await isDuplicate(redis, skuCode, qty);
@@ -128,24 +128,24 @@ describe('WorkerRateLimiterIntegration', () => {
     const originalSleep = require('../../src/nuvemshop').sleep;
     require('../../src/nuvemshop').sleep = jest.fn().mockResolvedValue(undefined);
 
-    // Simula comportamento real: limiter começa com 100 tokens
-    // API pode retornar valores diferentes baseado em uso real
+    // Simula comportamento real: limiter começa com 40 tokens (bucket Nuvemshop)
+    // API pode retornar valores menores baseado no uso compartilhado
     const prodLimiter = new TokenBucketRateLimiter({
-      maxTokens: 100,
-      refillRate: 100 / 60,
+      maxTokens: 40,
+      refillRate: 2, // 2 req/s
     });
 
     // Simula requisição 1
     await prodLimiter.acquire();
-    expect(prodLimiter.getStatus().tokens).toBeLessThan(100);
+    expect(prodLimiter.getStatus().tokens).toBeLessThan(40);
 
     // API responde com rate-limit-remaining reduzido (foi usado em outro lugar)
-    prodLimiter.adjustCapacityFromHeader(50);
-    expect(prodLimiter.getStatus().tokens).toBe(50);
+    prodLimiter.adjustCapacityFromHeader(20);
+    expect(prodLimiter.getStatus().tokens).toBe(20);
 
     // Simula requisição 2
     await prodLimiter.acquire();
-    expect(prodLimiter.getStatus().tokens).toBeCloseTo(49, 0.5);
+    expect(prodLimiter.getStatus().tokens).toBeCloseTo(19, 0.5);
 
     prodLimiter.destroy();
     require('../../src/nuvemshop').sleep = originalSleep;

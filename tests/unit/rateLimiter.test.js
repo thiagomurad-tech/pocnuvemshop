@@ -22,10 +22,10 @@ describe('TokenBucketRateLimiter', () => {
       expect(limiter.getStatus().tokens).toBe(10);
     });
 
-    test('Usa valores padrão se não informado', () => {
+    test('usa valores padrão calibrados para Nuvemshop (bucket=40, drain=2 req/s)', () => {
       const defaultLimiter = new TokenBucketRateLimiter();
-      expect(defaultLimiter.maxTokens).toBe(100);
-      expect(defaultLimiter.refillRate).toBe(100 / 60);
+      expect(defaultLimiter.maxTokens).toBe(40);   // bucket Nuvemshop
+      expect(defaultLimiter.refillRate).toBe(2);    // 2 req/s drain
       defaultLimiter.destroy();
     });
   });
@@ -188,31 +188,72 @@ describe('TokenBucketRateLimiter', () => {
     });
   });
 
-  describe('cenário real: Nuvemshop rate limit', () => {
-    test('simula limite de 100 req/min', async () => {
+  describe('cenário real: Nuvemshop rate limit (bucket=40, drain=2 req/s)', () => {
+    test('esgota burst de 40 requisições e enfileira a 41ª', async () => {
       const nuvemshopLimiter = new TokenBucketRateLimiter({
-        maxTokens: 100,
-        refillRate: 100 / 60, // 100 em 60 segundos = 1.67/s
+        maxTokens: 40,
+        refillRate: 2,        // 2 req/s — drain real da Nuvemshop
         refillInterval: 100,
       });
 
-      // Consome burst capacity
-      const acquireCount = 0;
-      for (let i = 0; i < 100; i++) {
+      // Consome burst capacity completo (40 tokens)
+      for (let i = 0; i < 40; i++) {
         await nuvemshopLimiter.acquire();
       }
-      expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(0);
       expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
+      expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(0);
 
-      // Próxima requisição entra em fila
+      // 41ª requisição entra em fila (sem tokens disponíveis)
       const nextReq = nuvemshopLimiter.acquire();
       expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(1);
 
-      // Simula resposta com header x-rate-limit-remaining
-      nuvemshopLimiter.adjustCapacityFromHeader(50);
-      await nextReq; // Deve resolver imediatamente (reset via header)
+      // Header x-rate-limit-remaining sincroniza o bucket — resolve imediatamente
+      nuvemshopLimiter.adjustCapacityFromHeader(20);
+      await nextReq;
+      expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(0);
 
       nuvemshopLimiter.destroy();
+    });
+
+    test('reposição a 2 req/s após burst esgotado', async () => {
+      const nuvemshopLimiter = new TokenBucketRateLimiter({
+        maxTokens: 40,
+        refillRate: 2,
+        refillInterval: 50,
+      });
+
+      // Esgota todos os tokens
+      for (let i = 0; i < 40; i++) {
+        await nuvemshopLimiter.acquire();
+      }
+      expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
+
+      // Após 200ms, deve ter reposto ~0.4 tokens (2 req/s × 0.2s)
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(nuvemshopLimiter.getStatus().tokens).toBeGreaterThanOrEqual(0.3);
+      expect(nuvemshopLimiter.getStatus().tokens).toBeLessThanOrEqual(40);
+
+      nuvemshopLimiter.destroy();
+    });
+
+    test('plano Next/Evolution (10× multiplicador): bucket=400, drain=20 req/s', async () => {
+      const nextPlanLimiter = new TokenBucketRateLimiter({
+        maxTokens: 400,
+        refillRate: 20,       // 20 req/s = 2 req/s × 10×
+        refillInterval: 100,
+      });
+
+      expect(nextPlanLimiter.maxTokens).toBe(400);
+      expect(nextPlanLimiter.refillRate).toBe(20);
+
+      // Consome 100 tokens — bem abaixo do burst de 400
+      for (let i = 0; i < 100; i++) {
+        await nextPlanLimiter.acquire();
+      }
+      expect(nextPlanLimiter.getStatus().tokens).toBeGreaterThanOrEqual(0);
+      expect(nextPlanLimiter.getStatus().waitingRequests).toBe(0);
+
+      nextPlanLimiter.destroy();
     });
   });
 });

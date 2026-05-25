@@ -17,11 +17,12 @@ const redis = new Redis({
   maxRetriesPerRequest: null,
 });
 
-// Rate limiter: Nuvemshop permite ~100 requests/minuto
-// Configurável via variáveis de ambiente
+// Rate limiter calibrado para o Leaky Bucket real da Nuvemshop:
+//   bucket = 40 requisições, drain = 2 req/s
+// RATE_LIMIT_REFILL_RATE é em req/min (dividido por 60 para obter req/s)
 const rateLimiter = new TokenBucketRateLimiter({
-  maxTokens: parseInt(process.env.RATE_LIMIT_MAX_TOKENS || '100', 10),
-  refillRate: parseInt(process.env.RATE_LIMIT_REFILL_RATE || '100', 10) / 60, // por segundo
+  maxTokens: parseInt(process.env.RATE_LIMIT_MAX_TOKENS  || '40',  10),
+  refillRate: parseInt(process.env.RATE_LIMIT_REFILL_RATE || '120', 10) / 60, // 120/min = 2 req/s
 });
 
 const worker = new Worker(
