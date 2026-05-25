@@ -5,8 +5,8 @@ require('dotenv').config();
 const express = require('express');
 const Redis   = require('ioredis');
 
-const logger                          = require('./logger');
-const { createQueue, enqueueStockUpdate } = require('./queue');
+const logger                                        = require('./logger');
+const { createQueue, enqueueStockUpdate, QUEUE_NAME } = require('./queue');
 
 const app   = express();
 const redis = new Redis({
@@ -67,6 +67,65 @@ app.post('/webhook/stock', async (req, res) => {
 });
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+// ── Thresholds de alerta da fila ──────────────────────────────────────────────
+const QUEUE_WARN_WAITING  = 1_000;   // fila crescendo — investigar
+const QUEUE_CRIT_WAITING  = 10_000;  // crítico — escalar workers
+const QUEUE_WARN_FAILED   = 10;      // jobs na DLQ — revisar erros
+const QUEUE_CRIT_FAILED   = 100;     // falha sistêmica
+
+app.get('/health/queue', async (_req, res) => {
+  try {
+    const counts = await queue.getJobCounts(
+      'waiting', 'active', 'delayed', 'failed', 'completed', 'paused'
+    );
+
+    // Determina status geral
+    let status = 'healthy';
+    const alerts = [];
+
+    if (counts.waiting >= QUEUE_CRIT_WAITING) {
+      status = 'critical';
+      alerts.push(`fila crítica: ${counts.waiting} jobs aguardando (limite: ${QUEUE_CRIT_WAITING})`);
+    } else if (counts.waiting >= QUEUE_WARN_WAITING) {
+      status = 'degraded';
+      alerts.push(`fila elevada: ${counts.waiting} jobs aguardando (limite: ${QUEUE_WARN_WAITING})`);
+    }
+
+    if (counts.failed >= QUEUE_CRIT_FAILED) {
+      status = 'critical';
+      alerts.push(`DLQ crítica: ${counts.failed} jobs com falha (limite: ${QUEUE_CRIT_FAILED})`);
+    } else if (counts.failed >= QUEUE_WARN_FAILED) {
+      if (status === 'healthy') status = 'degraded';
+      alerts.push(`DLQ com falhas: ${counts.failed} jobs (limite: ${QUEUE_WARN_FAILED})`);
+    }
+
+    logger.debug({ msg: 'Health da fila consultado', status, counts });
+
+    const httpStatus = status === 'critical' ? 503 : 200;
+    return res.status(httpStatus).json({
+      status,
+      queue: {
+        name:      QUEUE_NAME,
+        waiting:   counts.waiting,    // enfileirados, aguardando worker
+        active:    counts.active,     // sendo processados agora
+        delayed:   counts.delayed,    // aguardando retry com backoff
+        failed:    counts.failed,     // DLQ — tentativas esgotadas
+        completed: counts.completed,  // concluídos recentemente (janela 1h)
+        paused:    counts.paused,
+      },
+      thresholds: {
+        waiting:  { warn: QUEUE_WARN_WAITING, critical: QUEUE_CRIT_WAITING },
+        failed:   { warn: QUEUE_WARN_FAILED,  critical: QUEUE_CRIT_FAILED  },
+      },
+      alerts,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error({ msg: 'Erro ao consultar health da fila', err: err.message });
+    return res.status(503).json({ status: 'error', error: err.message });
+  }
+});
 
 // Inicia o servidor apenas se for o entry point (não quando importado para testes)
 if (require.main === module) {
