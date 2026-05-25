@@ -11,16 +11,16 @@ const logger = require('./logger');
 class NuvemshopClient {
   /**
    * @param {Object} config - Configuração do cliente
-   * @param {string} config.storeId - ID da loja (ex: 7748578)
+   * @param {string} config.storeId - ID da loja (ex: 123456)
    * @param {string} config.accessToken - Token de acesso Bearer
-   * @param {string} config.apiBaseUrl - URL base da API (ex: https://api.nuvemshop.com.br/v1)
+   * @param {string} config.apiBaseUrl - URL base da API (ex: https://api.nuvemshop.com.br/2025-03)
    * @param {number} config.maxRetries - Máx tentativas (padrão: 5)
    * @param {number} config.retryDelayMs - Atraso inicial em ms (padrão: 1000)
    */
   constructor(config) {
     this.storeId = config.storeId || process.env.NUVEMSHOP_STORE_ID;
     this.accessToken = config.accessToken || process.env.NUVEMSHOP_ACCESS_TOKEN;
-    this.apiBaseUrl = config.apiBaseUrl || process.env.NUVEMSHOP_API_BASE_URL || 'https://api.nuvemshop.com.br/v1';
+    this.apiBaseUrl = config.apiBaseUrl || process.env.NUVEMSHOP_API_BASE_URL || 'https://api.nuvemshop.com.br/2025-03';
     this.maxRetries = config.maxRetries || 5;
     this.retryDelayMs = config.retryDelayMs || 1000;
 

@@ -11,9 +11,9 @@ jest.mock('../../src/logger', () => ({
 }));
 
 describe('NuvemshopClient', () => {
-  const STORE_ID = '<SEU_STORE_ID>';
-  const TOKEN = '<SEU_ACCESS_TOKEN>';
-  const API_URL = 'https://api.nuvemshop.com.br/v1';
+  const STORE_ID = 'test-store-id';
+  const TOKEN    = 'test-access-token';
+  const API_URL  = 'https://api.nuvemshop.com.br/2025-03';
 
   let client;
 

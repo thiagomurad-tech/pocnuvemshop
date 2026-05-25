@@ -14,7 +14,7 @@ npm run dev          # with hot reload (nodemon)
 npm start            # production
 
 # Start queue worker (separate process)
-npm run worker
+npm run workergit 
 
 # Tests
 npm test                    # all tests (unit + integration), runs in serial
