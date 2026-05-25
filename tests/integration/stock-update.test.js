@@ -20,7 +20,7 @@ afterEach(() => {
 
 const S = 'test-store', T = 'test-token', P = '1001', V = '2001', SKU = 'TSHIRT-M-RED', QTY = 150;
 const PATH  = `/2025-03/${S}/products/${P}/variants/stock`;
-const BODY  = { action: 'replace', stock: QTY, id: V };
+const BODY  = { action: 'replace', value: QTY, id: V };
 
 describe('Fluxo de atualização de estoque', () => {
   let redis;

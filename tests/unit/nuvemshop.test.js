@@ -9,7 +9,7 @@ const { updateVariantStock, NuvemshopApiError, MaxRetriesExceededError, computeD
 
 const BASE = { storeId: '123456', productId: '456', variantId: '789', stock: 42, accessToken: 'test-token', skuCode: 'SKU-001' };
 const STOCK_PATH = '/2025-03/123456/products/456/variants/stock';
-const STOCK_BODY = { action: 'replace', stock: 42, id: '789' };
+const STOCK_BODY = { action: 'replace', value: 42, id: '789' };
 
 beforeEach(() => { 
   nock.cleanAll(); 
@@ -55,7 +55,7 @@ describe('updateVariantStock — sucesso', () => {
       });
     await updateVariantStock(BASE);
     expect(capturedBody).not.toHaveProperty('stock_management');
-    expect(capturedBody).toMatchObject({ action: 'replace', stock: 42, id: '789' });
+    expect(capturedBody).toMatchObject({ action: 'replace', value: 42, id: '789' });
   });
   test('envia headers obrigatórios', async () => {
     nock('https://api.nuvemshop.com.br')

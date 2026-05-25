@@ -9,7 +9,8 @@
     "dev":              "nodemon src/app.js",
     "test":             "jest --runInBand --forceExit",
     "test:unit":        "jest tests/unit --runInBand",
-    "test:integration": "jest tests/integration --runInBand --forceExit"
+    "test:integration": "jest tests/integration --runInBand --forceExit",
+    "test:e2e":         "NUVEMSHOP_TESTING_REAL=true jest --config jest.e2e.config.js --runInBand --forceExit"
   },
   "dependencies": {
     "bullmq":  "^5.0.0",

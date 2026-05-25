@@ -50,7 +50,7 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
           'Content-Type': 'application/json',
           'User-Agent':   USER_AGENT,
         },
-        body: JSON.stringify({ action: 'replace', stock, id: variantId }),
+        body: JSON.stringify({ action: 'replace', value: stock, id: variantId }),
       });
     } catch (networkErr) {
       logger.error({

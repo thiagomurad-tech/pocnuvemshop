@@ -47,7 +47,7 @@ describe('WorkerRateLimiterIntegration', () => {
 
     // Setup nock — retorna 32 remaining (dentro do bucket de 40)
     nock('https://api.nuvemshop.com.br')
-      .post(PATH, { action: 'replace', stock: qty, id: V })
+      .post(PATH, { action: 'replace', value: qty, id: V })
       .reply(200, { id: parseInt(V), sku: skuCode, stock: qty }, { 'x-rate-limit-remaining': '32' });
 
     // 1. Verificar se é duplicata
