@@ -7,7 +7,7 @@ const Redis      = require('ioredis');
 
 const logger                        = require('./logger');
 const { isDuplicate }               = require('./idempotency');
-const { updateVariantStock }        = require('./nuvemshop');
+const { updateVariantStock, NuvemshopApiError } = require('./nuvemshop');
 const { QUEUE_NAME }                = require('./queue');
 const TokenBucketRateLimiter        = require('./rateLimiter');
 
@@ -70,11 +70,27 @@ const worker = new Worker(
     });
 
     // ── Chamada à API ─────────────────────────────────────────────────────────
-    const result = await updateVariantStock({
-      storeId:     process.env.NUVEMSHOP_STORE_ID,
-      accessToken: process.env.NUVEMSHOP_ACCESS_TOKEN,
-      productId, variantId, stock, skuCode,
-    });
+    let result;
+    try {
+      result = await updateVariantStock({
+        storeId:     process.env.NUVEMSHOP_STORE_ID,
+        accessToken: process.env.NUVEMSHOP_ACCESS_TOKEN,
+        productId, variantId, stock, skuCode,
+      });
+    } catch (err) {
+      // Erros não-retriáveis (404, 422, 400, 401, 403): descarta o job sem retry
+      if (err instanceof NuvemshopApiError && !err.retryable) {
+        logger.warn({
+          msg:        'Job descartado — erro não-retriável da API Nuvemshop',
+          status:     err.statusCode,
+          api_body:   err.body,
+          ...ctx,
+        });
+        return { discarded: true, reason: 'non_retryable', statusCode: err.statusCode };
+      }
+      // Erros retriáveis (429, 5xx, rede): propaga para o BullMQ retentar
+      throw err;
+    }
 
     // ── Sincroniza rate limiter com header da resposta ────────────────────────
     if (result.headers?.rateLimitRemaining !== undefined) {
