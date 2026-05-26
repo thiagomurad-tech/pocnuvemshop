@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PCO-Nuvemshop — Middleware de Estoque · Fashion Corp</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #1c2333;
+    --border:    #30363d;
+    --text:      #c9d1d9;
+    --text-dim:  #8b949e;
+    --indigo:    #6366f1;
+    --indigo-lt: #818cf8;
+    --cyan:      #22d3ee;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --red:       #f85149;
+    --orange:    #f0883e;
+    --purple:    #a371f7;
+    --radius:    10px;
+    --radius-lg: 16px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ── NAV ─────────────────────────────────────────────────────── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,17,23,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0;
+    padding: 0 32px;
+    height: 56px;
+  }
+  nav .brand {
+    font-weight: 700; font-size: 15px;
+    color: #fff; margin-right: 32px; white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  nav .brand span { color: var(--cyan); }
+  .nav-links { display: flex; gap: 4px; flex: 1; }
+  .nav-links a {
+    color: var(--text-dim); text-decoration: none;
+    padding: 6px 14px; border-radius: 6px;
+    font-size: 14px; font-weight: 500;
+    transition: all .15s;
+  }
+  .nav-links a:hover { color: #fff; background: var(--surface2); }
+  .nav-links a.active { color: #fff; background: var(--surface2); }
+  .badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; color: var(--text-dim);
+    margin-left: auto;
+  }
+
+  /* ── HERO ────────────────────────────────────────────────────── */
+  .hero {
+    padding: 72px 32px 56px;
+    max-width: 1100px; margin: 0 auto;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+    color: var(--indigo-lt); padding: 5px 16px; border-radius: 20px;
+    font-size: 13px; font-weight: 500; margin-bottom: 24px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 48px); font-weight: 700;
+    line-height: 1.2; color: #fff; margin-bottom: 16px;
+  }
+  .hero h1 em { font-style: normal; color: var(--cyan); }
+  .hero p {
+    font-size: 17px; color: var(--text-dim);
+    max-width: 620px; margin: 0 auto 40px;
+  }
+
+  /* speed comparison */
+  .speed-bar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; margin-bottom: 48px; flex-wrap: wrap;
+  }
+  .speed-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 28px;
+    min-width: 160px; text-align: center;
+  }
+  .speed-node .label { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .speed-node .value { font-size: 28px; font-weight: 800; }
+  .speed-node.sap   .value { color: var(--red); }
+  .speed-node.mw    .value { color: var(--cyan); }
+  .speed-node.ns    .value { color: var(--green); }
+  .speed-arrow {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px; padding: 0 8px;
+  }
+  .speed-arrow .arr { font-size: 22px; color: var(--border); animation: pulse-arr 1.8s ease-in-out infinite; }
+  .speed-arrow .arr:nth-child(2) { animation-delay: .2s; }
+  .speed-arrow .arr:nth-child(3) { animation-delay: .4s; }
+  @keyframes pulse-arr { 0%,100%{opacity:.25} 50%{opacity:1} }
+  .speed-arrow span { font-size: 11px; color: var(--text-dim); }
+
+  /* stats row */
+  .stats { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .stat-card .icon { font-size: 24px; }
+  .stat-card .info .n { font-size: 20px; font-weight: 700; color: #fff; }
+  .stat-card .info .d { font-size: 12px; color: var(--text-dim); }
+
+  /* ── SECTION ─────────────────────────────────────────────────── */
+  section { max-width: 1100px; margin: 0 auto; padding: 0 32px 72px; }
+  .section-header { margin-bottom: 32px; }
+  .section-header h2 {
+    font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-header h2 .num {
+    background: var(--surface2); border: 1px solid var(--border);
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--text-dim); flex-shrink: 0;
+  }
+  .section-header p { color: var(--text-dim); max-width: 620px; }
+  .divider { height: 1px; background: var(--border); margin-bottom: 72px; max-width: 1100px; margin-left: auto; margin-right: auto; }
+
+  /* ── LIFECYCLE STEPPER ───────────────────────────────────────── */
+  .lifecycle {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media(max-width:700px){ .lifecycle{ grid-template-columns:1fr; } }
+
+  .step-list { display: flex; flex-direction: column; gap: 4px; }
+  .step-btn {
+    background: none; border: none; cursor: pointer;
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px; border-radius: var(--radius);
+    text-align: left; transition: all .15s;
+    border: 1px solid transparent;
+    width: 100%;
+  }
+  .step-btn:hover { background: var(--surface2); }
+  .step-btn.active {
+    background: rgba(99,102,241,.1);
+    border-color: rgba(99,102,241,.3);
+  }
+  .step-dot {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); transition: all .15s;
+    margin-top: 1px;
+  }
+  .step-btn.active .step-dot {
+    background: var(--indigo); border-color: var(--indigo);
+    color: #fff; box-shadow: 0 0 12px rgba(99,102,241,.5);
+  }
+  .step-btn.done .step-dot { background: var(--green); border-color: var(--green); color: #fff; }
+  .step-label { font-size: 13px; font-weight: 500; color: var(--text-dim); }
+  .step-btn.active .step-label { color: #fff; }
+  .step-sublabel { font-size: 12px; color: var(--text-dim); opacity: .7; }
+
+  .step-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    min-height: 320px;
+  }
+  .step-content { display: none; }
+  .step-content.active { display: block; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  .step-content h3 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .step-content .step-desc { color: var(--text-dim); margin-bottom: 20px; font-size: 14px; }
+
+  .step-visual {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .step-visual .mono {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px; line-height: 1.8;
+  }
+  .kw  { color: var(--purple); }
+  .str { color: var(--green); }
+  .num-c { color: var(--orange); }
+  .cmt { color: var(--text-dim); }
+  .hl  { color: var(--cyan); }
+  .ok  { color: var(--green); }
+  .err-c { color: var(--red); }
+  .warn-c { color: var(--yellow); }
+
+  .result-row {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+  }
+  .result-chip {
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .chip-ok   { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.3); }
+  .chip-skip { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+  .chip-wait { background: rgba(34,211,238,.15); color: var(--cyan); border: 1px solid rgba(34,211,238,.3); }
+  .chip-err  { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+
+  .step-nav {
+    display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end;
+  }
+  .btn {
+    padding: 8px 20px; border-radius: var(--radius); border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .btn-ghost {
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: var(--border); }
+  .btn-primary {
+    background: var(--indigo); color: #fff;
+  }
+  .btn-primary:hover { background: var(--indigo-lt); }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* ── RULE CARDS ─────────────────────────────────────────────── */
+  .rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .rule-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .rule-card:hover { border-color: var(--indigo); box-shadow: 0 0 0 1px var(--indigo); }
+  .rule-card.open { border-color: var(--indigo); }
+
+  .rule-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 20px 22px;
+  }
+  .rule-icon {
+    width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .rule-header .title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .rule-header .subtitle { font-size: 12px; color: var(--text-dim); }
+  .rule-chevron { margin-left: auto; color: var(--text-dim); transition: transform .2s; font-size: 12px; }
+  .rule-card.open .rule-chevron { transform: rotate(180deg); }
+
+  .rule-body {
+    display: none; padding: 0 22px 22px;
+    border-top: 1px solid var(--border);
+    animation: fadeIn .2s ease;
+  }
+  .rule-card.open .rule-body { display: block; padding-top: 20px; }
+
+  .rule-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+  .rule-table th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 6px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .rule-table td { padding: 8px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+  .rule-table td:first-child { font-weight: 500; color: #fff; white-space: nowrap; }
+
+  .rule-list { list-style: none; }
+  .rule-list li { padding: 7px 0; border-top: 1px solid var(--border); font-size: 13px; display: flex; gap: 8px; }
+  .rule-list li:first-child { border-top: none; }
+  .rule-list li .bullet { flex-shrink: 0; margin-top: 3px; }
+  .tag {
+    display: inline-block;
+    padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    font-family: monospace;
+  }
+  .tag-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .tag-red   { background: rgba(248,81,73,.15);  color: var(--red); }
+  .tag-yellow{ background: rgba(210,153,34,.15); color: var(--yellow); }
+  .tag-cyan  { background: rgba(34,211,238,.15); color: var(--cyan); }
+  .tag-purple{ background: rgba(163,113,247,.15);color: var(--purple); }
+
+  /* ── CODE MAP ────────────────────────────────────────────────── */
+  .code-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+  }
+  .code-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    text-decoration: none;
+    transition: all .15s;
+    display: block;
+  }
+  .code-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan), 0 4px 24px rgba(34,211,238,.08);
+    transform: translateY(-2px);
+  }
+  .code-card .file-path {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .code-card .file-icon {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .code-card .file-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px; font-weight: 600; color: var(--cyan);
+  }
+  .code-card .file-dir { font-size: 11px; color: var(--text-dim); }
+  .code-card .file-role { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .code-card .file-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .code-card .file-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+
+  .entry-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(99,102,241,.15); color: var(--indigo-lt);
+    border: 1px solid rgba(99,102,241,.3);
+    padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  /* ── ENDPOINTS ───────────────────────────────────────────────── */
+  .endpoints-table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface);
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .endpoints-table th {
+    background: var(--surface2); text-align: left;
+    padding: 12px 20px; font-size: 12px; font-weight: 600;
+    color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em;
+    border-bottom: 1px solid var(--border);
+  }
+  .endpoints-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+  .endpoints-table tr:last-child td { border-bottom: none; }
+  .method {
+    font-family: monospace; font-size: 12px; font-weight: 700;
+    padding: 3px 9px; border-radius: 5px;
+  }
+  .method.post { background: rgba(63,185,80,.15); color: var(--green); }
+  .method.get  { background: rgba(34,211,238,.15); color: var(--cyan); }
+  .ep-path { font-family: monospace; font-size: 13px; color: #fff; font-weight: 500; }
+  .ep-desc { color: var(--text-dim); }
+  .ep-status {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600; font-family: monospace;
+    padding: 2px 8px; border-radius: 5px;
+  }
+  .status-202 { background: rgba(63,185,80,.15); color: var(--green); }
+  .status-200 { background: rgba(34,211,238,.15); color: var(--cyan); }
+  .status-400 { background: rgba(248,81,73,.15);  color: var(--red); }
+  .status-503 { background: rgba(248,81,73,.15);  color: var(--red); }
+
+  /* ── FOOTER ─────────────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px 32px;
+    text-align: center;
+    color: var(--text-dim); font-size: 12px;
+  }
+
+  /* ── UTILS ───────────────────────────────────────────────────── */
+  .flex { display: flex; }
+  .gap-2 { gap: 8px; }
+  .mt-1 { margin-top: 8px; }
+  .mt-2 { margin-top: 16px; }
+  .text-sm { font-size: 13px; }
+  .text-xs { font-size: 12px; }
+  .text-dim { color: var(--text-dim); }
+  .text-white { color: #fff; }
+  .font-mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+
+  /* Progress bar for rate limiter viz */
+  .bucket-viz { margin-top: 16px; }
+  .bucket-bar-wrap {
+    background: var(--surface2); border-radius: 6px; height: 12px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .bucket-bar {
+    height: 100%; background: linear-gradient(90deg, var(--green), var(--cyan));
+    border-radius: 6px; transition: width 1s cubic-bezier(.4,0,.2,1);
+  }
+  .bucket-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-dim); }
+
+  .retry-timeline {
+    display: flex; gap: 0; align-items: center; margin-top: 8px; flex-wrap: wrap;
+  }
+  .retry-step {
+    display: flex; align-items: center; gap: 0;
+  }
+  .retry-dot {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .retry-dot.attempt { background: rgba(99,102,241,.2); color: var(--indigo-lt); border: 1px solid rgba(99,102,241,.4); }
+  .retry-dot.dead    { background: rgba(248,81,73,.15);  color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+  .retry-line { width: 30px; height: 2px; background: var(--border); flex-shrink: 0; }
+  .retry-wait { font-size: 10px; color: var(--text-dim); text-align: center; margin-top: 4px; }
+  .retry-stack { display: flex; flex-direction: column; align-items: center; }
+
+  .alert-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    border-radius: var(--radius); margin-bottom: 8px; font-size: 13px;
+  }
+  .alert-warn { background: rgba(210,153,34,.1); border: 1px solid rgba(210,153,34,.25); }
+  .alert-crit { background: rgba(248,81,73,.1);  border: 1px solid rgba(248,81,73,.25); }
+  .alert-icon { font-size: 18px; }
+  .alert-text strong { color: #fff; }
+  .alert-text { color: var(--text-dim); }
+
+  /* Animate token bucket on hover */
+  .bucket-sim {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px;
+    max-width: 260px;
+  }
+  .token {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--green); opacity: .85;
+    transition: all .3s;
+    flex-shrink: 0;
+  }
+  .token.empty { background: var(--border); opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="brand">⚡ <span>PCO</span>-Nuvemshop</div>
+  <div class="nav-links">
+    <a href="#visao" class="active">Visão Geral</a>
+    <a href="#lifecycle">Ciclo de Vida</a>
+    <a href="#regras">Regras</a>
+    <a href="#codigo">Código</a>
+    <a href="#endpoints">Endpoints</a>
+  </div>
+  <span class="badge">Fashion Corp · v1.0</span>
+</nav>
+
+<!-- HERO -->
+<div class="hero" id="visao">
+  <div class="hero-eyebrow">🏭 Fashion Corp · Middleware de Sincronização de Estoque</div>
+  <h1>SAP → <em>Middleware</em> → Nuvemshop</h1>
+  <p>O ERP envia notificações a 500 por segundo. A Nuvemshop aceita 2 por segundo. Este serviço absorve o pico, elimina duplicatas e entrega cada atualização sem perder uma sequer.</p>
+
+  <!-- speed comparison -->
+  <div class="speed-bar">
+    <div class="speed-node sap">
+      <div class="label">SAP ERP</div>
+      <div class="value">500/s</div>
+    </div>
+    <div class="speed-arrow">
+      <div class="arr">›</div>
+      <div class="arr">›</div>
+      <div class="arr">›</div>
+      <span>250×</span>
+    </div>
+    <div class="speed-node mw">
+      <div class="label">PCO-Nuvemshop</div>
+      <div class="value">∞ buffer</div>
+    </div>
+    <div class="speed-arrow">
+      <div class="arr">›</div>
+      <div class="arr">›</div>
+      <div class="arr">›</div>
+      <span>controlado</span>
+    </div>
+    <div class="speed-node ns">
+      <div class="label">Nuvemshop</div>
+      <div class="value">2/s</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <span class="icon">🛡️</span>
+      <div class="info">
+        <div class="n">5 min</div>
+        <div class="d">Janela de deduplicação</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="icon">🔁</span>
+      <div class="info">
+        <div class="n">5 retries</div>
+        <div class="d">Backoff exponencial automático</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="icon">⚡</span>
+      <div class="info">
+        <div class="n">10 workers</div>
+        <div class="d">Concorrência paralela na fila</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="icon">📊</span>
+      <div class="info">
+        <div class="n">Grafana</div>
+        <div class="d">Logs em tempo real via Loki</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- LIFECYCLE -->
+<section id="lifecycle">
+  <div class="section-header">
+    <h2><span class="num">1</span> Ciclo de Vida de uma Atualização</h2>
+    <p>Clique em cada etapa para ver o que acontece dentro do sistema quando o SAP envia uma mudança de estoque.</p>
+  </div>
+
+  <div class="lifecycle">
+    <!-- step list -->
+    <div class="step-list" id="stepList">
+      <button class="step-btn active" data-step="0" onclick="goStep(0)">
+        <div class="step-dot">1</div>
+        <div>
+          <div class="step-label">SAP envia webhook</div>
+          <div class="step-sublabel">POST /webhook/stock</div>
+        </div>
+      </button>
+      <button class="step-btn" data-step="1" onclick="goStep(1)">
+        <div class="step-dot">2</div>
+        <div>
+          <div class="step-label">Validação do payload</div>
+          <div class="step-sublabel">Campos obrigatórios</div>
+        </div>
+      </button>
+      <button class="step-btn" data-step="2" onclick="goStep(2)">
+        <div class="step-dot">3</div>
+        <div>
+          <div class="step-label">Enfileiramento</div>
+          <div class="step-sublabel">Redis BullMQ · 202 imediato</div>
+        </div>
+      </button>
+      <button class="step-btn" data-step="3" onclick="goStep(3)">
+        <div class="step-dot">4</div>
+        <div>
+          <div class="step-label">Idempotência</div>
+          <div class="step-sublabel">SHA-256 · dedup 5 min</div>
+        </div>
+      </button>
+      <button class="step-btn" data-step="4" onclick="goStep(4)">
+        <div class="step-dot">5</div>
+        <div>
+          <div class="step-label">Rate Limiter</div>
+          <div class="step-sublabel">Token Bucket · 40 tokens</div>
+        </div>
+      </button>
+      <button class="step-btn" data-step="5" onclick="goStep(5)">
+        <div class="step-dot">6</div>
+        <div>
+          <div class="step-label">Chamada à API</div>
+          <div class="step-sublabel">Nuvemshop + retry</div>
+        </div>
+      </button>
+      <button class="step-btn" data-step="6" onclick="goStep(6)">
+        <div class="step-dot">7</div>
+        <div>
+          <div class="step-label">Conclusão</div>
+          <div class="step-sublabel">Sucesso ou DLQ</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- panels -->
+    <div class="step-panel">
+
+      <!-- Step 0 -->
+      <div class="step-content active" id="step-0">
+        <h3>📡 SAP envia o webhook</h3>
+        <p class="step-desc">O SAP detecta uma mudança de estoque no armazém e dispara imediatamente uma requisição HTTP para o middleware. Pode chegar em rajadas de até 500 por segundo.</p>
+        <div class="step-visual">
+          <div class="mono">
+<span class="kw">POST</span> <span class="hl">http://middleware:3001/webhook/stock</span><br>
+<span class="cmt">Content-Type: application/json</span><br><br>
+{<br>
+&nbsp;&nbsp;<span class="str">"sku_code"</span>:   <span class="str">"SKU-CAMISETA-P"</span>,<br>
+&nbsp;&nbsp;<span class="str">"product_id"</span>: <span class="str">"346452988"</span>,<br>
+&nbsp;&nbsp;<span class="str">"variant_id"</span>: <span class="str">"1531149939"</span>,<br>
+&nbsp;&nbsp;<span class="str">"stock"</span>:      <span class="num-c">50</span><br>
+}
+          </div>
+        </div>
+        <div class="result-row">
+          <span class="result-chip chip-ok">📥 Recebido pelo Receiver (src/app.js)</span>
+        </div>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="step-content" id="step-1">
+        <h3>🔍 Validação do payload</h3>
+        <p class="step-desc">O Receiver verifica se todos os campos obrigatórios estão presentes. Se qualquer campo faltar, a requisição é rejeitada imediatamente — sem enfileirar nada.</p>
+        <div class="step-visual">
+          <div class="mono">
+<span class="cmt">// src/app.js — validação</span><br>
+<span class="kw">const</span> { sku_code, product_id, variant_id, stock } = req.body;<br><br>
+<span class="kw">if</span> (!sku_code || !product_id || !variant_id || stock == <span class="kw">null</span>) {<br>
+&nbsp;&nbsp;<span class="kw">return</span> res.<span class="hl">status</span>(<span class="num-c">400</span>).json({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;error: <span class="str">'Campos obrigatórios: sku_code, product_id, variant_id, stock'</span><br>
+&nbsp;&nbsp;});<br>
+}
+          </div>
+        </div>
+        <div class="result-row">
+          <span class="result-chip chip-ok">✅ Válido → continua</span>
+          <span class="result-chip chip-err">❌ Inválido → HTTP 400 (SAP deve corrigir)</span>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-content" id="step-2">
+        <h3>📦 Enfileiramento no Redis</h3>
+        <p class="step-desc">O job é salvo imediatamente no Redis via BullMQ. O sistema responde HTTP 202 ao SAP em menos de 1 segundo — o processamento real acontece em segundo plano.</p>
+        <div class="step-visual">
+          <div class="mono">
+<span class="cmt">// src/queue.js — configuração do job</span><br>
+queue.add(<span class="str">'update-stock'</span>, payload, {<br>
+&nbsp;&nbsp;attempts: <span class="num-c">5</span>,           <span class="cmt">// até 5 tentativas</span><br>
+&nbsp;&nbsp;backoff: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;type:  <span class="str">'exponential'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;delay: <span class="num-c">2_000</span>        <span class="cmt">// 2s base</span><br>
+&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;removeOnFail: <span class="kw">false</span>   <span class="cmt">// preserva na DLQ</span><br>
+});<br><br>
+<span class="cmt">// SAP recebe imediatamente:</span><br>
+res.<span class="hl">status</span>(<span class="num-c">202</span>).json({ jobId: <span class="str">"42"</span>, status: <span class="str">"queued"</span> });
+          </div>
+        </div>
+        <div class="result-row">
+          <span class="result-chip chip-ok">📬 HTTP 202 → SAP confirmado</span>
+          <span class="result-chip chip-wait">⏳ Job aguarda worker na fila</span>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-content" id="step-3">
+        <h3>🛡️ Idempotência — filtro de duplicatas</h3>
+        <p class="step-desc">Antes de qualquer chamada externa, o Worker verifica se esse exato par sku+estoque já foi processado nos últimos 5 minutos. Se sim, descarta silenciosamente.</p>
+        <div class="step-visual">
+          <div class="mono">
+<span class="cmt">// src/idempotency.js</span><br>
+<span class="kw">const</span> hash = SHA256(<span class="str">`</span><span class="hl">${skuCode}</span><span class="str">:</span><span class="hl">${stock}</span><span class="str">`</span>);<br>
+<span class="cmt">// ex: SHA256("SKU-CAMISETA-P:50") = "a3f8..."</span><br><br>
+<span class="kw">const</span> existing = <span class="kw">await</span> redis.get(<span class="str">`idem:</span><span class="hl">${skuCode}</span><span class="str">`</span>);<br><br>
+<span class="kw">if</span> (existing === hash) {<br>
+&nbsp;&nbsp;<span class="cmt">// mesmo SKU, mesmo estoque → DESCARTA</span><br>
+&nbsp;&nbsp;<span class="kw">return</span> { skipped: <span class="kw">true</span> };<br>
+}<br><br>
+<span class="cmt">// novo estado → grava hash com TTL de 5 min</span><br>
+redis.setex(<span class="str">`idem:</span><span class="hl">${skuCode}</span><span class="str">`</span>, <span class="num-c">300</span>, hash);
+          </div>
+        </div>
+        <div class="result-row">
+          <span class="result-chip chip-skip">⏭️ Duplicata → descartado (sem chamada à API)</span>
+          <span class="result-chip chip-ok">✅ Novo estado → continua para rate limiter</span>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-content" id="step-4">
+        <h3>🎟️ Rate Limiter — Token Bucket</h3>
+        <p class="step-desc">Cada chamada à Nuvemshop consome um "token". O balde tem 40 tokens e repõe 2 por segundo. Se vazio, o worker aguarda pacientemente — sem perder o job.</p>
+
+        <div style="margin-bottom:16px">
+          <div style="font-size:13px;color:var(--text-dim);margin-bottom:8px">Balde de tokens atual (simulação):</div>
+          <div class="bucket-sim" id="tokenBucket"></div>
+          <div style="display:flex;gap:12px;margin-top:10px">
+            <button class="btn btn-ghost text-sm" onclick="consumeToken()">🔻 Consumir token</button>
+            <button class="btn btn-ghost text-sm" onclick="refillTokens()">🔄 Repor tokens</button>
+          </div>
+        </div>
+
+        <div class="step-visual">
+          <div class="mono">
+<span class="cmt">// src/rateLimiter.js — Token Bucket</span><br>
+maxTokens  = <span class="num-c">40</span>    <span class="cmt">// capacidade do balde</span><br>
+refillRate = <span class="num-c">2</span>/s  <span class="cmt">// +2 tokens por segundo</span><br><br>
+<span class="kw">await</span> rateLimiter.<span class="hl">acquire</span>();   <span class="cmt">// aguarda se vazio</span><br>
+<span class="cmt">// após resposta da API:</span><br>
+rateLimiter.<span class="hl">adjustCapacityFromHeader</span>(x-rate-limit-remaining);
+          </div>
+        </div>
+        <div class="result-row">
+          <span class="result-chip chip-wait">⏳ Sem token → aguarda (job não é perdido)</span>
+          <span class="result-chip chip-ok">✅ Token disponível → chama API</span>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step-content" id="step-5">
+        <h3>🌐 Chamada à API Nuvemshop</h3>
+        <p class="step-desc">O cliente HTTP faz a requisição à Nuvemshop. Se receber erros transitórios (429, 5xx), aguarda e retenta. Erros permanentes (4xx) são descartados — não há retry.</p>
+        <div class="step-visual">
+          <div class="mono">
+<span class="kw">POST</span> <span class="hl">https://api.nuvemshop.com.br/2025-03/{store}/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl">products/{productId}/variants/stock</span><br><br>
+<span class="cmt">Authentication: bearer {token}   // ← NÃO é "Authorization"</span><br><br>
+{ <span class="str">"action"</span>: <span class="str">"replace"</span>, <span class="str">"value"</span>: <span class="num-c">50</span>, <span class="str">"id"</span>: <span class="str">"153..."</span> }
+          </div>
+        </div>
+        <div class="result-row">
+          <span class="result-chip chip-ok">200 OK → sucesso ✅</span>
+          <span class="result-chip chip-skip">429 / 5xx → retry ⏳</span>
+          <span class="result-chip chip-err">404 / 400 → descarta ❌</span>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step-content" id="step-6">
+        <h3>🏁 Conclusão</h3>
+        <p class="step-desc">Job concluído com sucesso — log registrado. Se todas as 5 tentativas falharem, o job vai para a DLQ para análise humana. Nenhum dado é perdido.</p>
+
+        <div class="retry-timeline" id="retryTimeline">
+          <div class="retry-step">
+            <div class="retry-stack">
+              <div class="retry-dot attempt">T1</div>
+              <div class="retry-wait">2s</div>
+            </div>
+            <div class="retry-line"></div>
+          </div>
+          <div class="retry-step">
+            <div class="retry-stack">
+              <div class="retry-dot attempt">T2</div>
+              <div class="retry-wait">4s</div>
+            </div>
+            <div class="retry-line"></div>
+          </div>
+          <div class="retry-step">
+            <div class="retry-stack">
+              <div class="retry-dot attempt">T3</div>
+              <div class="retry-wait">8s</div>
+            </div>
+            <div class="retry-line"></div>
+          </div>
+          <div class="retry-step">
+            <div class="retry-stack">
+              <div class="retry-dot attempt">T4</div>
+              <div class="retry-wait">16s</div>
+            </div>
+            <div class="retry-line"></div>
+          </div>
+          <div class="retry-step">
+            <div class="retry-stack">
+              <div class="retry-dot attempt">T5</div>
+              <div class="retry-wait">32s</div>
+            </div>
+            <div class="retry-line"></div>
+          </div>
+          <div class="retry-stack">
+            <div class="retry-dot dead">DLQ</div>
+            <div class="retry-wait">🔴 alerta</div>
+          </div>
+        </div>
+
+        <div class="result-row" style="margin-top:16px">
+          <span class="result-chip chip-ok">✅ Sucesso → log + job concluído</span>
+          <span class="result-chip chip-err">🔴 5× falha → DLQ + alerta Grafana</span>
+        </div>
+      </div>
+
+      <!-- nav buttons -->
+      <div class="step-nav">
+        <button class="btn btn-ghost" id="btnPrev" onclick="prevStep()" disabled>← Anterior</button>
+        <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Próxima etapa →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- REGRAS -->
+<section id="regras">
+  <div class="section-header">
+    <h2><span class="num">2</span> Regras de Negócio Implementadas</h2>
+    <p>Clique em cada card para expandir os detalhes de como a regra funciona no código.</p>
+  </div>
+
+  <div class="rules-grid">
+
+    <!-- Dedup -->
+    <div class="rule-card" onclick="toggleRule(this)">
+      <div class="rule-header">
+        <div class="rule-icon" style="background:rgba(63,185,80,.12)">🛡️</div>
+        <div>
+          <div class="title">Deduplicação (Idempotência)</div>
+          <div class="subtitle">src/idempotency.js · Redis SETEX</div>
+        </div>
+        <span class="rule-chevron">▼</span>
+      </div>
+      <div class="rule-body">
+        <p class="text-dim text-sm" style="margin-bottom:12px">Evita que o mesmo estoque seja enviado à Nuvemshop duas vezes dentro da janela de tempo configurada.</p>
+        <table class="rule-table">
+          <tr><th>Parâmetro</th><th>Valor</th></tr>
+          <tr><td>Janela de dedup</td><td><span class="tag tag-cyan">5 minutos</span> (configurável via <code>IDEMPOTENCY_TTL_SECONDS</code>)</td></tr>
+          <tr><td>Chave de comparação</td><td><code>SHA-256(sku_code + ":" + stock)</code></td></tr>
+          <tr><td>Armazenamento</td><td>Redis <code>SETEX</code> — expira automaticamente</td></tr>
+          <tr><td>Se duplicata</td><td><span class="tag tag-yellow">Job descartado</span> — sem chamada à API</td></tr>
+          <tr><td>Se estoque mudou</td><td><span class="tag tag-green">Processa normalmente</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Rate Limiting -->
+    <div class="rule-card" onclick="toggleRule(this)">
+      <div class="rule-header">
+        <div class="rule-icon" style="background:rgba(34,211,238,.12)">🎟️</div>
+        <div>
+          <div class="title">Rate Limiting — Token Bucket</div>
+          <div class="subtitle">src/rateLimiter.js · em memória</div>
+        </div>
+        <span class="rule-chevron">▼</span>
+      </div>
+      <div class="rule-body">
+        <p class="text-dim text-sm" style="margin-bottom:12px">Garante que o sistema nunca envie mais requisições do que a Nuvemshop consegue receber. Calibrado para o limite real da plataforma.</p>
+        <table class="rule-table">
+          <tr><th>Parâmetro</th><th>Valor</th></tr>
+          <tr><td>Capacidade do balde</td><td><span class="tag tag-cyan">40 tokens</span> (configurável via <code>RATE_LIMIT_MAX_TOKENS</code>)</td></tr>
+          <tr><td>Taxa de reposição</td><td><span class="tag tag-cyan">2 tokens/segundo</span> (120/min)</td></tr>
+          <tr><td>Sem token disponível</td><td><span class="tag tag-yellow">Aguarda</span> — sem perder o job</td></tr>
+          <tr><td>Sincronização dinâmica</td><td>Ajusta via header <code>x-rate-limit-remaining</code> a cada resposta</td></tr>
+          <tr><td>Back-pressure</td><td>Log de alerta quando fila de espera do limiter cresce</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Retry & DLQ -->
+    <div class="rule-card" onclick="toggleRule(this)">
+      <div class="rule-header">
+        <div class="rule-icon" style="background:rgba(248,81,73,.12)">🔁</div>
+        <div>
+          <div class="title">Retry automático & DLQ</div>
+          <div class="subtitle">src/nuvemshop.js · src/worker.js · BullMQ</div>
+        </div>
+        <span class="rule-chevron">▼</span>
+      </div>
+      <div class="rule-body">
+        <p class="text-dim text-sm" style="margin-bottom:12px">Erros transitórios são tratados com retry exponencial. Erros permanentes são descartados sem retry.</p>
+        <table class="rule-table">
+          <tr><th>Erro</th><th>Comportamento</th></tr>
+          <tr><td>429 Rate limit</td><td><span class="tag tag-yellow">Retry</span> — espera o tempo do header reset</td></tr>
+          <tr><td>5xx Servidor</td><td><span class="tag tag-yellow">Retry</span> — backoff exponencial</td></tr>
+          <tr><td>404 Não encontrado</td><td><span class="tag tag-red">Descarta</span> — produto inválido na Nuvemshop</td></tr>
+          <tr><td>400 / 422 Inválido</td><td><span class="tag tag-red">Descarta</span> — corrigir na origem</td></tr>
+          <tr><td>401 / 403 Auth</td><td><span class="tag tag-red">Descarta</span> — credenciais inválidas</td></tr>
+          <tr><td>Rede / timeout</td><td><span class="tag tag-yellow">Retry</span> — até esgotar tentativas</td></tr>
+          <tr><td>Após 5 falhas</td><td><span class="tag tag-red">DLQ</span> — preservado para análise humana</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Health & Alertas -->
+    <div class="rule-card" onclick="toggleRule(this)">
+      <div class="rule-header">
+        <div class="rule-icon" style="background:rgba(163,113,247,.12)">📊</div>
+        <div>
+          <div class="title">Health & Alertas de Fila</div>
+          <div class="subtitle">src/app.js · GET /health/queue</div>
+        </div>
+        <span class="rule-chevron">▼</span>
+      </div>
+      <div class="rule-body">
+        <p class="text-dim text-sm" style="margin-bottom:12px">O endpoint <code>/health/queue</code> expõe o estado da fila com limiares pré-configurados. Retorna HTTP 503 em estado crítico — disparando alertas automaticamente em qualquer monitor de uptime.</p>
+
+        <div class="alert-row alert-warn">
+          <span class="alert-icon">🟡</span>
+          <div class="alert-text"><strong>Degraded</strong> — fila &gt; 1.000 jobs <em>ou</em> DLQ &gt; 10 jobs · HTTP 200</div>
+        </div>
+        <div class="alert-row alert-crit">
+          <span class="alert-icon">🔴</span>
+          <div class="alert-text"><strong>Critical</strong> — fila &gt; 10.000 jobs <em>ou</em> DLQ &gt; 100 jobs · HTTP 503</div>
+        </div>
+
+        <table class="rule-table" style="margin-top:12px">
+          <tr><th>Campo na resposta</th><th>Significa</th></tr>
+          <tr><td><code>waiting</code></td><td>Jobs enfileirados aguardando worker</td></tr>
+          <tr><td><code>active</code></td><td>Sendo processados agora</td></tr>
+          <tr><td><code>delayed</code></td><td>Em backoff (aguardando retry)</td></tr>
+          <tr><td><code>failed</code></td><td>Na DLQ — requer atenção</td></tr>
+          <tr><td><code>completed</code></td><td>Concluídos na última hora</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Payload Validation -->
+    <div class="rule-card" onclick="toggleRule(this)">
+      <div class="rule-header">
+        <div class="rule-icon" style="background:rgba(210,153,34,.12)">✅</div>
+        <div>
+          <div class="title">Validação de Entrada</div>
+          <div class="subtitle">src/app.js · Express middleware</div>
+        </div>
+        <span class="rule-chevron">▼</span>
+      </div>
+      <div class="rule-body">
+        <p class="text-dim text-sm" style="margin-bottom:12px">Toda requisição do SAP é validada antes de qualquer processamento. Campos faltando resultam em rejeição imediata.</p>
+        <table class="rule-table">
+          <tr><th>Campo</th><th>Tipo</th><th>Regra</th></tr>
+          <tr><td><code>sku_code</code></td><td>string</td><td><span class="tag tag-red">Obrigatório</span></td></tr>
+          <tr><td><code>product_id</code></td><td>string</td><td><span class="tag tag-red">Obrigatório</span></td></tr>
+          <tr><td><code>variant_id</code></td><td>string</td><td><span class="tag tag-red">Obrigatório</span></td></tr>
+          <tr><td><code>stock</code></td><td>number</td><td><span class="tag tag-red">Obrigatório</span> (aceita 0)</td></tr>
+        </table>
+        <div class="mt-2 text-sm text-dim">JSON malformado retorna HTTP 400 antes mesmo de entrar na lógica de negócio.</div>
+      </div>
+    </div>
+
+    <!-- Observability -->
+    <div class="rule-card" onclick="toggleRule(this)">
+      <div class="rule-header">
+        <div class="rule-icon" style="background:rgba(99,102,241,.12)">🔍</div>
+        <div>
+          <div class="title">Observabilidade & Rastreabilidade</div>
+          <div class="subtitle">src/logger.js · Winston + Grafana Loki</div>
+        </div>
+        <span class="rule-chevron">▼</span>
+      </div>
+      <div class="rule-body">
+        <p class="text-dim text-sm" style="margin-bottom:12px">Cada operação gera um log JSON estruturado com campos padronizados, permitindo filtrar e rastrear qualquer SKU ou job específico.</p>
+        <table class="rule-table">
+          <tr><th>Campo de log</th><th>Quando aparece</th></tr>
+          <tr><td><code>alert: "DLQ"</code></td><td>Job esgotou as 5 tentativas — <span class="tag tag-red">alerta crítico</span></td></tr>
+          <tr><td><code>msg: "duplicata"</code></td><td>Evento idempotente descartado</td></tr>
+          <tr><td><code>msg: "back-pressure"</code></td><td>Fila do rate limiter crescendo</td></tr>
+          <tr><td><code>skuCode</code></td><td>Em todos os logs — permite rastrear um SKU</td></tr>
+          <tr><td><code>jobId</code></td><td>Em todos os logs — rastreia o job completo</td></tr>
+        </table>
+        <div class="mt-2 text-sm" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:monospace;font-size:12px;color:var(--text-dim)">
+          <span style="color:var(--cyan)"># LogQL no Grafana para rastrear um SKU:</span><br>
+          {service="pco-nuvemshop"} | json | skuCode="SKU-CAMISETA-P"
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CÓDIGO -->
+<section id="codigo">
+  <div class="section-header">
+    <h2><span class="num">3</span> Mapa do Código-Fonte</h2>
+    <p>Os arquivos mais importantes do sistema — clique para abrir diretamente.</p>
+  </div>
+
+  <div style="margin-bottom:20px">
+    <span class="entry-badge">⚡ Entrypoints principais</span>
+  </div>
+
+  <div class="code-grid">
+
+    <a class="code-card" href="./src/app.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(63,185,80,.12)">🚀</div>
+        <div>
+          <div class="file-name">app.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Receiver — Processo 1</div>
+      <div class="file-desc">Servidor Express na porta 3001. Ponto de entrada do SAP. Recebe POST /webhook/stock, valida o payload, enfileira o job e responde 202. Expõe também /health e /health/queue.</div>
+      <div class="file-tags">
+        <span class="tag tag-green">ENTRYPOINT</span>
+        <span class="tag tag-cyan">Express</span>
+        <span class="tag tag-purple">porta 3001</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/worker.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(99,102,241,.12)">⚙️</div>
+        <div>
+          <div class="file-name">worker.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Worker — Processo 2</div>
+      <div class="file-desc">Motor do sistema. Consome 10 jobs simultaneamente da fila. Orquestra o ciclo completo: idempotência → rate limiter → chamada API → retry. Envia jobs falhos para DLQ após 5 tentativas.</div>
+      <div class="file-tags">
+        <span class="tag tag-green">ENTRYPOINT</span>
+        <span class="tag tag-purple">BullMQ Worker</span>
+        <span class="tag tag-cyan">concurrency=10</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/queue.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(34,211,238,.12)">📥</div>
+        <div>
+          <div class="file-name">queue.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Fila BullMQ</div>
+      <div class="file-desc">Configura a fila "stock-updates" no Redis. Define política de retry (5×, backoff exponencial base 2s) e limpeza de jobs concluídos (máx 1.000, janela 1h). removeOnFail: false preserva DLQ.</div>
+      <div class="file-tags">
+        <span class="tag tag-cyan">BullMQ Queue</span>
+        <span class="tag tag-yellow">5 retries</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/idempotency.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(63,185,80,.12)">🛡️</div>
+        <div>
+          <div class="file-name">idempotency.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Deduplicação</div>
+      <div class="file-desc">Calcula SHA-256(sku_code:stock) e consulta o Redis. Se o hash já existe (TTL 5 min), o job é descartado sem chamar a API. Se novo estado, grava o hash com expiração automática.</div>
+      <div class="file-tags">
+        <span class="tag tag-green">SHA-256</span>
+        <span class="tag tag-cyan">Redis SETEX</span>
+        <span class="tag tag-yellow">TTL 5min</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/rateLimiter.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(34,211,238,.12)">🎟️</div>
+        <div>
+          <div class="file-name">rateLimiter.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Token Bucket Rate Limiter</div>
+      <div class="file-desc">Implementa o algoritmo Token Bucket calibrado para a Nuvemshop: 40 tokens máx, +2/segundo. Aceita ajuste dinâmico via x-rate-limit-remaining. Fila interna garante zero perda de jobs.</div>
+      <div class="file-tags">
+        <span class="tag tag-cyan">Token Bucket</span>
+        <span class="tag tag-green">40 tokens</span>
+        <span class="tag tag-purple">2/s refill</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/nuvemshop.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(248,81,73,.12)">🌐</div>
+        <div>
+          <div class="file-name">nuvemshop.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Client HTTP — Nuvemshop (Worker)</div>
+      <div class="file-desc">Usado pelo worker em produção. Faz POST /products/:id/variants/stock com retry interno para 429/5xx e jitter. Classifica erros como retriáveis ou não-retriáveis. Auth: bearer (minúsculo).</div>
+      <div class="file-tags">
+        <span class="tag tag-red">Nuvemshop API</span>
+        <span class="tag tag-yellow">retry+jitter</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/nuvemshop-client.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(163,113,247,.12)">📦</div>
+        <div>
+          <div class="file-name">nuvemshop-client.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Client Estruturado — CRUD completo</div>
+      <div class="file-desc">Client de mais alto nível com CRUD de produtos, busca por SKU e atualização em lote via PATCH /products/stock-price (até 50 variantes por chamada). Ainda não conectado ao worker — usado em testes e futuras integrações.</div>
+      <div class="file-tags">
+        <span class="tag tag-purple">CRUD</span>
+        <span class="tag tag-cyan">batch 50 vars</span>
+      </div>
+    </a>
+
+    <a class="code-card" href="./src/logger.js">
+      <div class="file-path">
+        <div class="file-icon" style="background:rgba(210,153,34,.12)">📋</div>
+        <div>
+          <div class="file-name">logger.js</div>
+          <div class="file-dir">src/</div>
+        </div>
+      </div>
+      <div class="file-role">Sistema de Logs</div>
+      <div class="file-desc">Winston configurado com saída JSON estruturada. Escreve em logs/combined.log e logs/error.log. Envio opcional ao Grafana Loki via HTTP (ativado quando LOKI_HOST está definido no .env).</div>
+      <div class="file-tags">
+        <span class="tag tag-yellow">Winston</span>
+        <span class="tag tag-purple">Grafana Loki</span>
+        <span class="tag tag-cyan">JSON logs</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div style="margin-top:32px">
+    <div style="font-size:13px;font-weight:600;color:var(--text-dim);margin-bottom:14px;letter-spacing:.05em;text-transform:uppercase">Outros arquivos relevantes</div>
+    <div class="code-grid">
+      <a class="code-card" href="./tests/unit/" style="opacity:.8">
+        <div class="file-path">
+          <div class="file-icon" style="background:rgba(63,185,80,.08)">🧪</div>
+          <div><div class="file-name">unit/</div><div class="file-dir">tests/</div></div>
+        </div>
+        <div class="file-role">Testes unitários</div>
+        <div class="file-desc">Cobrem rateLimiter, idempotency, nuvemshop, worker. Sem Redis nem rede — rodam em qualquer máquina.</div>
+        <div class="file-tags"><span class="tag tag-green">Jest · ioredis-mock</span></div>
+      </a>
+      <a class="code-card" href="./tests/integration/" style="opacity:.8">
+        <div class="file-path">
+          <div class="file-icon" style="background:rgba(34,211,238,.08)">🔗</div>
+          <div><div class="file-name">integration/</div><div class="file-dir">tests/</div></div>
+        </div>
+        <div class="file-role">Testes de integração</div>
+        <div class="file-desc">Testam webhook → fila → worker → API com mock da Nuvemshop via nock. Incluem cenários de rate limiter no worker.</div>
+        <div class="file-tags"><span class="tag tag-cyan">Jest · nock · supertest</span></div>
+      </a>
+      <a class="code-card" href="./grafana/dashboard.json" style="opacity:.8">
+        <div class="file-path">
+          <div class="file-icon" style="background:rgba(163,113,247,.08)">📊</div>
+          <div><div class="file-name">dashboard.json</div><div class="file-dir">grafana/</div></div>
+        </div>
+        <div class="file-role">Dashboard Grafana</div>
+        <div class="file-desc">Arquivo importável. Painéis de volume de jobs, DLQ, latência e alertas em tempo real via Loki.</div>
+        <div class="file-tags"><span class="tag tag-purple">Grafana · Loki</span></div>
+      </a>
+      <a class="code-card" href="./.env.example" style="opacity:.8">
+        <div class="file-path">
+          <div class="file-icon" style="background:rgba(210,153,34,.08)">⚙️</div>
+          <div><div class="file-name">.env.example</div><div class="file-dir">./</div></div>
+        </div>
+        <div class="file-role">Configuração do ambiente</div>
+        <div class="file-desc">Todas as variáveis: credenciais Nuvemshop, Redis, rate limit, TTL de idempotência e endereço Loki.</div>
+        <div class="file-tags"><span class="tag tag-yellow">dotenv</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ENDPOINTS -->
+<section id="endpoints">
+  <div class="section-header">
+    <h2><span class="num">4</span> Endpoints da API</h2>
+    <p>Todos os endpoints expostos pelo Receiver (processo 1, porta 3001).</p>
+  </div>
+
+  <table class="endpoints-table">
+    <thead>
+      <tr>
+        <th>Método</th>
+        <th>Endpoint</th>
+        <th>Quem usa</th>
+        <th>O que faz</th>
+        <th>Respostas</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><span class="ep-path">/webhook/stock</span></td>
+        <td class="ep-desc">SAP ERP</td>
+        <td class="ep-desc">Recebe atualização de estoque. Valida payload, enfileira job no Redis e confirma imediatamente.</td>
+        <td>
+          <span class="ep-status status-202">202 queued</span><br>
+          <span class="ep-status status-400" style="margin-top:4px;display:inline-flex">400 inválido</span>
+        </td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><span class="ep-path">/health</span></td>
+        <td class="ep-desc">Monitoramento</td>
+        <td class="ep-desc">Liveness check básico — confirma que o processo está vivo.</td>
+        <td><span class="ep-status status-200">200 ok</span></td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><span class="ep-path">/health/queue</span></td>
+        <td class="ep-desc">Grafana · UptimeRobot</td>
+        <td class="ep-desc">Estado detalhado da fila: waiting, active, delayed, failed, completed. Retorna 503 quando status for <strong>critical</strong> — dispara alertas automaticamente em qualquer monitor de uptime.</td>
+        <td>
+          <span class="ep-status status-200">200 healthy/degraded</span><br>
+          <span class="ep-status status-503" style="margin-top:4px;display:inline-flex">503 critical</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;font-family:monospace;font-size:13px;line-height:1.8">
+    <span style="color:var(--text-dim)"># Testar localmente:</span><br>
+    <span style="color:var(--green)">curl</span> -X POST http://localhost:3001/webhook/stock \<br>
+    &nbsp;&nbsp;-H <span style="color:var(--yellow)">"Content-Type: application/json"</span> \<br>
+    &nbsp;&nbsp;-d <span style="color:var(--yellow)">'{"sku_code":"SKU-001","product_id":"123","variant_id":"456","stock":50}'</span>
+  </div>
+</section>
+
+<footer>
+  PCO-Nuvemshop · Fashion Corp · v1.0 &nbsp;·&nbsp; Gerado em 26/05/2026
+  &nbsp;·&nbsp; <a href="./DOCUMENTACAO_GERAL.md" style="color:var(--text-dim)">Documentação completa (Markdown)</a>
+  &nbsp;·&nbsp; <a href="./README.md" style="color:var(--text-dim)">README técnico</a>
+</footer>
+
+<script>
+  // ── Stepper ──────────────────────────────────────────────────────
+  let currentStep = 0;
+  const totalSteps = 7;
+
+  function goStep(n) {
+    document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.step-btn').forEach((btn, i) => {
+      btn.classList.remove('active');
+      if (i < n) btn.classList.add('done'); else btn.classList.remove('done');
+    });
+    document.getElementById('step-' + n).classList.add('active');
+    document.querySelector('[data-step="' + n + '"]').classList.add('active');
+    currentStep = n;
+    document.getElementById('btnPrev').disabled = n === 0;
+    document.getElementById('btnNext').disabled = n === totalSteps - 1;
+    document.getElementById('btnNext').textContent = n === totalSteps - 1 ? '✓ Fim do ciclo' : 'Próxima etapa →';
+  }
+
+  function nextStep() { if (currentStep < totalSteps - 1) goStep(currentStep + 1); }
+  function prevStep() { if (currentStep > 0) goStep(currentStep - 1); }
+
+  // ── Rule cards ───────────────────────────────────────────────────
+  function toggleRule(card) {
+    const isOpen = card.classList.contains('open');
+    document.querySelectorAll('.rule-card').forEach(c => c.classList.remove('open'));
+    if (!isOpen) card.classList.add('open');
+  }
+
+  // ── Token bucket simulation ──────────────────────────────────────
+  let tokens = 40;
+  const maxTokens = 40;
+
+  function renderBucket() {
+    const el = document.getElementById('tokenBucket');
+    if (!el) return;
+    el.innerHTML = '';
+    for (let i = 0; i < maxTokens; i++) {
+      const t = document.createElement('div');
+      t.className = 'token' + (i >= tokens ? ' empty' : '');
+      el.appendChild(t);
+    }
+  }
+
+  function consumeToken() {
+    if (tokens > 0) tokens--;
+    renderBucket();
+  }
+
+  function refillTokens() {
+    const interval = setInterval(() => {
+      if (tokens < maxTokens) { tokens = Math.min(maxTokens, tokens + 2); renderBucket(); }
+      else clearInterval(interval);
+    }, 80);
+  }
+
+  renderBucket();
+
+  // ── Nav active highlight on scroll ───────────────────────────────
+  const sections = document.querySelectorAll('section[id], div.hero[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.nav-links a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
