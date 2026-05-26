@@ -97,7 +97,7 @@ WHEN last() OF A IS ABOVE 5
 | **Evaluate every** | `5m` |
 | **For** | `0m` |
 | **Severity** | `warning` |
-| **Summary** | `Jobs descartados por produto/variante inválido` |
+| **Summary** | `Jobs descartados por erro 4xx da Nuvemshop (produto ou variante inexistente). Verificar sincronização de cadastro SAP ↔ Nuvemshop.` |
 | **Description** | `Jobs descartados por erro 4xx da Nuvemshop (produto ou variante inexistente). Verificar sincronização de cadastro SAP ↔ Nuvemshop.` |
 
 **Query (A) — colar no editor Loki:**
