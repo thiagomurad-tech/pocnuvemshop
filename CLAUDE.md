@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project does
 
-Stock-sync middleware for Fashion Corp: SAP ERP sends up to 500 webhook req/s → this service absorbs peaks, deduplicates, and forwards to the Nuvemshop API respecting its rate limit (~100 req/min).
+Stock-sync middleware for Fashion Corp: SAP ERP sends up to 500 webhook req/s → this service absorbs peaks, deduplicates, and forwards to the Nuvemshop API respecting its rate limit (~500 req/s).
 
 ## Commands
 

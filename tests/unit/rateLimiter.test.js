@@ -22,10 +22,10 @@ describe('TokenBucketRateLimiter', () => {
       expect(limiter.getStatus().tokens).toBe(10);
     });
 
-    test('usa valores padrão calibrados para Nuvemshop (bucket=40, drain=2 req/s)', () => {
+    test('usa valores padrão calibrados para Nuvemshop (bucket=40, drain=500 req/s)', () => {
       const defaultLimiter = new TokenBucketRateLimiter();
       expect(defaultLimiter.maxTokens).toBe(40);   // bucket Nuvemshop
-      expect(defaultLimiter.refillRate).toBe(2);    // 2 req/s drain
+      expect(defaultLimiter.refillRate).toBe(500);  // 500 req/s drain
       defaultLimiter.destroy();
     });
   });
@@ -188,11 +188,11 @@ describe('TokenBucketRateLimiter', () => {
     });
   });
 
-  describe('cenário real: Nuvemshop rate limit (bucket=40, drain=2 req/s)', () => {
+  describe('cenário real: Nuvemshop rate limit (bucket=40, drain=500 req/s)', () => {
     test('esgota burst de 40 requisições e enfileira a 41ª', async () => {
       const nuvemshopLimiter = new TokenBucketRateLimiter({
         maxTokens: 40,
-        refillRate: 2,        // 2 req/s — drain real da Nuvemshop
+        refillRate: 500,      // 500 req/s — drain real da Nuvemshop
         refillInterval: 100,
       });
 
@@ -215,10 +215,10 @@ describe('TokenBucketRateLimiter', () => {
       nuvemshopLimiter.destroy();
     });
 
-    test('reposição a 2 req/s após burst esgotado', async () => {
+    test('reposição a 500 req/s após burst esgotado', async () => {
       const nuvemshopLimiter = new TokenBucketRateLimiter({
         maxTokens: 40,
-        refillRate: 2,
+        refillRate: 500,
         refillInterval: 50,
       });
 
@@ -228,23 +228,23 @@ describe('TokenBucketRateLimiter', () => {
       }
       expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
 
-      // Após 200ms, deve ter reposto ~0.4 tokens (2 req/s × 0.2s)
+      // Após 200ms a 500 req/s: 500 × 0.2s = 100 tokens gerados, capped em maxTokens=40
       await new Promise(resolve => setTimeout(resolve, 200));
-      expect(nuvemshopLimiter.getStatus().tokens).toBeGreaterThanOrEqual(0.3);
+      expect(nuvemshopLimiter.getStatus().tokens).toBeGreaterThanOrEqual(38);
       expect(nuvemshopLimiter.getStatus().tokens).toBeLessThanOrEqual(40);
 
       nuvemshopLimiter.destroy();
     });
 
-    test('plano Next/Evolution (10× multiplicador): bucket=400, drain=20 req/s', async () => {
+    test('plano Next/Evolution (10× multiplicador): bucket=400, drain=5000 req/s', async () => {
       const nextPlanLimiter = new TokenBucketRateLimiter({
         maxTokens: 400,
-        refillRate: 20,       // 20 req/s = 2 req/s × 10×
+        refillRate: 5000,     // 5000 req/s = 500 req/s × 10×
         refillInterval: 100,
       });
 
       expect(nextPlanLimiter.maxTokens).toBe(400);
-      expect(nextPlanLimiter.refillRate).toBe(20);
+      expect(nextPlanLimiter.refillRate).toBe(5000);
 
       // Consome 100 tokens — bem abaixo do burst de 400
       for (let i = 0; i < 100; i++) {

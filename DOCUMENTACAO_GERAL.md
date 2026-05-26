@@ -219,7 +219,7 @@ O sistema expõe dois endereços de verificação de saúde:
 │                                                                    │                │       │
 │                                                                    │ Token Bucket   │       │
 │                                                                    │ 40 tokens max  │       │
-│                                                                    │ +2 tokens/s    │       │
+│                                                                    │ +500 tokens/s  │       │
 │                                                                    │                │       │
 │                                                                    │ ↓ sem token → aguarda   │
 │                                                                    │ ↓ com token → consome   │
@@ -358,7 +358,7 @@ pco-nuvemshop/
 | [`src/worker.js`](./src/worker.js) | **Motor do sistema.** Consome jobs da fila (10 simultâneos), executa a sequência: idempotência → rate limiter → chamada à API. Gerencia retry e DLQ. | [→ ver código](./src/worker.js) |
 | [`src/queue.js`](./src/queue.js) | **Configuração da fila.** Define nome, opções de retry (5x, backoff exponencial com base em 2s) e política de limpeza de jobs concluídos (máx 1.000, por 1 hora). | [→ ver código](./src/queue.js) |
 | [`src/idempotency.js`](./src/idempotency.js) | **Filtro de duplicatas.** Calcula SHA-256 de `sku_code:stock` e compara com o valor salvo no Redis. Se idêntico dentro da janela de 5 min, descarta. | [→ ver código](./src/idempotency.js) |
-| [`src/rateLimiter.js`](./src/rateLimiter.js) | **Governador de velocidade.** Implementa Token Bucket: 40 tokens máx, reposição de 2/segundo. Aceita ajuste dinâmico via header `x-rate-limit-remaining` da Nuvemshop. | [→ ver código](./src/rateLimiter.js) |
+| [`src/rateLimiter.js`](./src/rateLimiter.js) | **Governador de velocidade.** Implementa Token Bucket: 40 tokens máx, reposição de 500/segundo. Aceita ajuste dinâmico via header `x-rate-limit-remaining` da Nuvemshop. | [→ ver código](./src/rateLimiter.js) |
 | [`src/nuvemshop.js`](./src/nuvemshop.js) | **Integração com Nuvemshop.** Realiza `POST /products/:id/variants/stock`. Trata 429 e 5xx com retry+jitter. Erros 4xx são classificados como não-retriáveis e descartados. | [→ ver código](./src/nuvemshop.js) |
 | [`src/nuvemshop-client.js`](./src/nuvemshop-client.js) | **Client Nuvemshop estendido.** Versão mais completa com CRUD de produtos, busca por SKU e atualização em lote (até 50 variantes por chamada via `PATCH /products/stock-price`). | [→ ver código](./src/nuvemshop-client.js) |
 | [`src/logger.js`](./src/logger.js) | **Sistema de logs.** Configuração do Winston: saída JSON, arquivos `combined.log` e `error.log`, e envio opcional ao Grafana Loki via HTTP. | [→ ver código](./src/logger.js) |

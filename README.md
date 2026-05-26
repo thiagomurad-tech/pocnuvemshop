@@ -5,7 +5,7 @@ Middleware de sincronização de estoque entre o SAP ERP da Fashion Corp e a pla
 ## Contexto
 
 O SAP envia webhooks de estoque sem controle de vazão (até 500 req/s).  
-Este middleware absorve os picos, elimina duplicatas e entrega as atualizações à Nuvemshop respeitando o rate limit da plataforma (bucket de 40 req, 2 req/s).
+Este middleware absorve os picos, elimina duplicatas e entrega as atualizações à Nuvemshop respeitando o rate limit da plataforma (bucket de 40 req, 500 req/s).
 
 ## Arquitetura
 
@@ -67,7 +67,7 @@ IDEMPOTENCY_TTL_SECONDS=300      # janela de dedup (5 min)
 
 # Rate limiter — Leaky Bucket Nuvemshop
 RATE_LIMIT_MAX_TOKENS=40         # capacidade do bucket
-RATE_LIMIT_REFILL_RATE=120       # req/min (÷60 = 2 req/s)
+RATE_LIMIT_REFILL_RATE=30000     # req/min (÷60 = 500 req/s)
 
 # Grafana Loki (opcional — omitir desativa o envio)
 LOKI_HOST=http://localhost:3100
@@ -224,7 +224,7 @@ Ao final gera artefatos de evidência em `reports/` (gitignored):
 | Autenticação | Header `Authentication: bearer <token>` — **não** `Authorization` |
 | Endpoint de estoque | `POST /2025-03/{store_id}/products/{product_id}/variants/stock` |
 | Body obrigatório | `{ "action": "replace", "value": <qty>, "id": "<variant_id>" }` |
-| Rate limit | bucket=40 req, drain=2 req/s |
+| Rate limit | bucket=40 req, drain=500 req/s |
 | Header de controle | `x-rate-limit-remaining` e `x-rate-limit-reset` (ms) |
 | User-Agent | Obrigatório — formato: `NomeDaApp (email@parceiro.com)` |
 

@@ -18,11 +18,11 @@ const redis = new Redis({
 });
 
 // Rate limiter calibrado para o Leaky Bucket real da Nuvemshop:
-//   bucket = 40 requisições, drain = 2 req/s
+//   bucket = 40 requisições, drain = 500 req/s
 // RATE_LIMIT_REFILL_RATE é em req/min (dividido por 60 para obter req/s)
 const rateLimiter = new TokenBucketRateLimiter({
   maxTokens:  parseInt(process.env.RATE_LIMIT_MAX_TOKENS  || '40',  10),
-  refillRate: parseInt(process.env.RATE_LIMIT_REFILL_RATE || '120', 10) / 60, // 120/min = 2 req/s
+  refillRate: parseInt(process.env.RATE_LIMIT_REFILL_RATE || '30000', 10) / 60, // 30000/min = 500 req/s
 });
 
 const MAX_JOB_ATTEMPTS = 5;

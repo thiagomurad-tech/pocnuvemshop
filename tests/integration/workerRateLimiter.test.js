@@ -32,11 +32,11 @@ describe('WorkerRateLimiterIntegration', () => {
     const originalSleep = require('../../src/nuvemshop').sleep;
     require('../../src/nuvemshop').sleep = jest.fn().mockResolvedValue(undefined);
 
-    // Limiter com parâmetros reais da Nuvemshop: bucket=40, drain=2 req/s
+    // Limiter com parâmetros reais da Nuvemshop: bucket=40, drain=500 req/s
     limiter.destroy();
     limiter = new TokenBucketRateLimiter({
       maxTokens: 40,
-      refillRate: 2,  // 2 req/s
+      refillRate: 500,  // 500 req/s
       refillInterval: 50,
     });
 
@@ -132,7 +132,7 @@ describe('WorkerRateLimiterIntegration', () => {
     // API pode retornar valores menores baseado no uso compartilhado
     const prodLimiter = new TokenBucketRateLimiter({
       maxTokens: 40,
-      refillRate: 2, // 2 req/s
+      refillRate: 500, // 500 req/s
     });
 
     // Simula requisição 1

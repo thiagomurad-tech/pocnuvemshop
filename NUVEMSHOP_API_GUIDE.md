@@ -136,7 +136,7 @@ curl -X GET "https://api.nuvemshop.com.br/v1/<SEU_STORE_ID>/products/sku/TSHIRT-
 
 ## ⚠️ Limitações & Quotas
 
-- **Rate Limit:** ~100 requisições/minuto
+- **Rate Limit:** 500 req/s (30.000 req/min)
 - **Header de resposta:** `x-rate-limit-remaining` 
 - **Batch máximo:** 50 variantes por PATCH
 - **Máximo de produtos:** 100.000 por loja
