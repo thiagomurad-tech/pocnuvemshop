@@ -236,24 +236,27 @@ describe('TokenBucketRateLimiter', () => {
       nuvemshopLimiter.destroy();
     });
 
-    test('plano Next/Evolution (10× multiplicador): bucket=400, drain=5000 req/s', async () => {
-      const nextPlanLimiter = new TokenBucketRateLimiter({
-        maxTokens: 400,
-        refillRate: 5000,     // 5000 req/s = 500 req/s × 10×
+    test('configuração conservadora (300 req/s) — abaixo do limite máximo de 500 req/s', async () => {
+      // 300 req/s é um exemplo válido de configuração dentro do teto de 500 req/s.
+      // O sistema NUNCA deve ser configurado com refillRate > 500 (limite máximo da Nuvemshop).
+      const conservativeLimiter = new TokenBucketRateLimiter({
+        maxTokens: 40,
+        refillRate: 300,      // 300 req/s — 60% do limite máximo (500 req/s)
         refillInterval: 100,
       });
 
-      expect(nextPlanLimiter.maxTokens).toBe(400);
-      expect(nextPlanLimiter.refillRate).toBe(5000);
+      expect(conservativeLimiter.maxTokens).toBe(40);
+      expect(conservativeLimiter.refillRate).toBe(300);
+      expect(conservativeLimiter.refillRate).toBeLessThanOrEqual(500); // nunca ultrapassa o teto
 
-      // Consome 100 tokens — bem abaixo do burst de 400
-      for (let i = 0; i < 100; i++) {
-        await nextPlanLimiter.acquire();
+      // Consome o burst completo de 40 tokens
+      for (let i = 0; i < 40; i++) {
+        await conservativeLimiter.acquire();
       }
-      expect(nextPlanLimiter.getStatus().tokens).toBeGreaterThanOrEqual(0);
-      expect(nextPlanLimiter.getStatus().waitingRequests).toBe(0);
+      expect(conservativeLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
+      expect(conservativeLimiter.getStatus().waitingRequests).toBe(0);
 
-      nextPlanLimiter.destroy();
+      conservativeLimiter.destroy();
     });
   });
 });
