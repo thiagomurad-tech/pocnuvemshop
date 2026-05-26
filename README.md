@@ -68,6 +68,9 @@ IDEMPOTENCY_TTL_SECONDS=300      # janela de dedup (5 min)
 # Rate limiter — Leaky Bucket Nuvemshop
 RATE_LIMIT_MAX_TOKENS=40         # capacidade do bucket
 RATE_LIMIT_REFILL_RATE=120       # req/min (÷60 = 2 req/s)
+
+# Grafana Loki (opcional — omitir desativa o envio)
+LOKI_HOST=http://localhost:3100
 ```
 
 ## Como rodar
@@ -227,13 +230,13 @@ Ao final gera artefatos de evidência em `reports/` (gitignored):
 
 ## Observabilidade
 
-### Logs
+### Logs locais
 
 Logs em JSON gravados em:
 - `logs/combined.log` — todos os níveis
 - `logs/error.log` — apenas erros
 
-Campos fixos para filtro em dashboards:
+Campos fixos para filtro:
 
 | Campo | Quando aparece | Uso |
 |-------|----------------|-----|
@@ -242,7 +245,51 @@ Campos fixos para filtro em dashboards:
 | `msg: "back-pressure ativo"` | Fila do rate limiter > 0 | Alerta de saturação |
 | `msg: "Job descartado"` | Erro 4xx não-retriável (ex: 404) | Produto inexistente na Nuvemshop |
 
-### Monitoramento ativo
+### Grafana Loki
+
+O serviço envia logs diretamente ao Loki via HTTP quando `LOKI_HOST` está definido no `.env` — sem necessidade de Promtail ou agente externo.
+
+**Configuração:**
+```dotenv
+LOKI_HOST=http://localhost:3100
+```
+
+Ao iniciar, o processo confirma a integração:
+```
+[Logger] Loki transport ativo → http://localhost:3100
+```
+
+**Labels dos streams** (usados para filtrar no Grafana):
+
+| Label | Valores |
+|-------|---------|
+| `service` | `pco-nuvemshop` |
+| `level` | `info` \| `warn` \| `error` |
+| `env` | `development` \| `production` |
+
+**Queries LogQL prontas:**
+
+```logql
+# Todos os logs do serviço
+{service="pco-nuvemshop"} | json
+
+# Alertas DLQ (job sem solução após 5 tentativas)
+{service="pco-nuvemshop", level="error"} | json | alert="DLQ"
+
+# Rate limit atingido (429)
+{service="pco-nuvemshop", level="warn"} | json | msg="Rate limit atingido (429)"
+
+# Jobs descartados por produto inexistente (404)
+{service="pco-nuvemshop"} | json | status=404
+
+# Back-pressure na fila do rate limiter
+{service="pco-nuvemshop"} | json | queue_depth > 0
+
+# Rastrear um SKU específico
+{service="pco-nuvemshop"} | json | skuCode="SKU-POSTMAN-001"
+```
+
+### Monitoramento ativo da fila
 
 Configure um monitor de uptime apontando para `GET /health/queue`. Quando a fila travar, o endpoint retorna HTTP 503 automaticamente — o monitor dispara o alerta sem necessidade de parsing de logs.
 
