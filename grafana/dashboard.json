@@ -1,0 +1,388 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "Selecione o datasource Loki configurado no Grafana",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    { "type": "datasource", "id": "loki",       "name": "Loki",       "version": "1.0.0" },
+    { "type": "panel",      "id": "logs",        "name": "Logs",       "version": "" },
+    { "type": "panel",      "id": "stat",        "name": "Stat",       "version": "" },
+    { "type": "panel",      "id": "timeseries",  "name": "Time series","version": "" },
+    { "type": "grafana",    "id": "grafana",     "name": "Grafana",    "version": "10.0.0" }
+  ],
+  "description": "Observabilidade do middleware pco-nuvemshop: fila BullMQ, rate limit, DLQ e logs estruturados via Grafana Loki.",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "📊 Visão Geral",
+      "type": "row"
+    },
+
+    {
+      "id": 2,
+      "title": "Jobs Concluídos",
+      "type": "stat",
+      "description": "Total de jobs processados com sucesso no período selecionado.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\", level=\"info\"} | json | msg=\"Estoque atualizado com sucesso\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["sum"] },
+        "text": {}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "🔴 Alertas DLQ",
+      "type": "stat",
+      "description": "Jobs que esgotaram todas as tentativas e foram para a Dead Letter Queue. Qualquer valor > 0 requer atenção imediata.",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\", level=\"error\"} | json | alert=\"DLQ\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["sum"] },
+        "text": {}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red",   "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "⚠️ Rate Limit (429)",
+      "type": "stat",
+      "description": "Quantidade de respostas 429 recebidas da Nuvemshop. O worker retenta automaticamente com backoff exponencial.",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\", level=\"warn\"} | json | msg=\"Rate limit atingido (429)\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["sum"] },
+        "text": {}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red",    "value": 20 }
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+
+    {
+      "id": 5,
+      "title": "🚫 Jobs Descartados (4xx)",
+      "type": "stat",
+      "description": "Jobs descartados por erro não-retriável da Nuvemshop (produto/variante inexistente, payload inválido etc.).",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\", level=\"warn\"} | json | msg=\"Job descartado — erro não-retriável da API Nuvemshop\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["sum"] },
+        "text": {}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 6,
+      "title": "📈 Série Temporal",
+      "type": "row"
+    },
+
+    {
+      "id": 7,
+      "title": "Eventos por nível ao longo do tempo",
+      "type": "timeseries",
+      "description": "Volume de logs por nível (info/warn/error) ao longo do tempo. Picos de warn/error indicam problemas.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "sum by (level) (count_over_time({service=\"pco-nuvemshop\"} | json [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "max"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "error" }, "properties": [{ "id": "color", "value": { "fixedColor": "red",    "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "warn"  }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "info"  }, "properties": [{ "id": "color", "value": { "fixedColor": "green",  "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "Rate limit (429) e DLQ ao longo do tempo",
+      "type": "timeseries",
+      "description": "Frequência de rate limit e DLQ. Ideal: zero. Picos indicam saturação ou falha sistêmica.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\", level=\"warn\"} | json | msg=\"Rate limit atingido (429)\" [$__interval])",
+          "queryType": "range",
+          "legendFormat": "429 rate limit",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\", level=\"error\"} | json | alert=\"DLQ\" [$__interval])",
+          "queryType": "range",
+          "legendFormat": "DLQ",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "count_over_time({service=\"pco-nuvemshop\"} | json | msg=\"Rate limiter com fila de espera — back-pressure ativo\" [$__interval])",
+          "queryType": "range",
+          "legendFormat": "back-pressure",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "max"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "DLQ"          }, "properties": [{ "id": "color", "value": { "fixedColor": "red",    "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "429 rate limit"}, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "back-pressure" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 9,
+      "title": "📋 Logs",
+      "type": "row"
+    },
+
+    {
+      "id": 10,
+      "title": "Todos os logs",
+      "type": "logs",
+      "description": "Stream completo de logs do serviço. Use os filtros de label (level, env) para refinar.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 15 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "{service=\"pco-nuvemshop\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+
+    {
+      "id": 11,
+      "title": "🔴 Alertas DLQ — detalhes",
+      "type": "logs",
+      "description": "Jobs que foram para a DLQ. Cada entrada contém skuCode, productId, variantId e err_message para diagnóstico.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "{service=\"pco-nuvemshop\", level=\"error\"} | json | alert=\"DLQ\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "🚫 Jobs descartados (4xx) — detalhes",
+      "type": "logs",
+      "description": "Jobs descartados por erro não-retriável (produto/variante inexistente, payload inválido). Investigar se recorrente.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+          "expr": "{service=\"pco-nuvemshop\"} | json | msg=\"Job descartado — erro não-retriável da API Nuvemshop\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    }
+
+  ],
+
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["pco-nuvemshop", "observabilidade", "nuvemshop"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Loki Datasource",
+        "multi": false,
+        "name": "DS_LOKI",
+        "options": [],
+        "query": "loki",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "pco-nuvemshop — Observabilidade",
+  "uid": "pco-nuvemshop-obs-v1",
+  "version": 1
+}
