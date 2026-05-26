@@ -22,9 +22,9 @@ describe('TokenBucketRateLimiter', () => {
       expect(limiter.getStatus().tokens).toBe(10);
     });
 
-    test('usa valores padrão calibrados para Nuvemshop (bucket=40, drain=500 req/s)', () => {
+    test('usa valores padrão calibrados para Nuvemshop (bucket=500, drain=500 req/s)', () => {
       const defaultLimiter = new TokenBucketRateLimiter();
-      expect(defaultLimiter.maxTokens).toBe(40);   // bucket Nuvemshop
+      expect(defaultLimiter.maxTokens).toBe(500);  // bucket = 1 s de throughput @ 500 req/s
       expect(defaultLimiter.refillRate).toBe(500);  // 500 req/s drain
       defaultLimiter.destroy();
     });
@@ -188,22 +188,22 @@ describe('TokenBucketRateLimiter', () => {
     });
   });
 
-  describe('cenário real: Nuvemshop rate limit (bucket=40, drain=500 req/s)', () => {
-    test('esgota burst de 40 requisições e enfileira a 41ª', async () => {
+  describe('cenário real: Nuvemshop rate limit (bucket=500, drain=500 req/s)', () => {
+    test('esgota burst de 500 requisições e enfileira a 501ª', async () => {
       const nuvemshopLimiter = new TokenBucketRateLimiter({
-        maxTokens: 40,
+        maxTokens: 500,
         refillRate: 500,      // 500 req/s — drain real da Nuvemshop
         refillInterval: 100,
       });
 
-      // Consome burst capacity completo (40 tokens)
-      for (let i = 0; i < 40; i++) {
+      // Consome burst capacity completo (500 tokens = 1 s de throughput)
+      for (let i = 0; i < 500; i++) {
         await nuvemshopLimiter.acquire();
       }
       expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
       expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(0);
 
-      // 41ª requisição entra em fila (sem tokens disponíveis)
+      // 501ª requisição entra em fila (sem tokens disponíveis)
       const nextReq = nuvemshopLimiter.acquire();
       expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(1);
 
@@ -217,40 +217,41 @@ describe('TokenBucketRateLimiter', () => {
 
     test('reposição a 500 req/s após burst esgotado', async () => {
       const nuvemshopLimiter = new TokenBucketRateLimiter({
-        maxTokens: 40,
+        maxTokens: 500,
         refillRate: 500,
         refillInterval: 50,
       });
 
       // Esgota todos os tokens
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 500; i++) {
         await nuvemshopLimiter.acquire();
       }
       expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
 
-      // Após 200ms a 500 req/s: 500 × 0.2s = 100 tokens gerados, capped em maxTokens=40
+      // Após 200ms a 500 req/s: 500 × 0.2s = 100 tokens gerados (abaixo do cap de 500)
+      // Piso em 60 para absorver variância de timing (refill a cada 50ms, ≥ 2 ciclos garantidos)
       await new Promise(resolve => setTimeout(resolve, 200));
-      expect(nuvemshopLimiter.getStatus().tokens).toBeGreaterThanOrEqual(38);
-      expect(nuvemshopLimiter.getStatus().tokens).toBeLessThanOrEqual(40);
+      expect(nuvemshopLimiter.getStatus().tokens).toBeGreaterThanOrEqual(60);
+      expect(nuvemshopLimiter.getStatus().tokens).toBeLessThanOrEqual(500);
 
       nuvemshopLimiter.destroy();
     });
 
-    test('configuração conservadora (300 req/s) — abaixo do limite máximo de 500 req/s', async () => {
-      // 300 req/s é um exemplo válido de configuração dentro do teto de 500 req/s.
+    test('configuração conservadora (300 req/s, 300 tokens) — abaixo do limite máximo de 500 req/s', async () => {
+      // maxTokens = refillRate = 300 mantém a semântica de "1 s de burst".
       // O sistema NUNCA deve ser configurado com refillRate > 500 (limite máximo da Nuvemshop).
       const conservativeLimiter = new TokenBucketRateLimiter({
-        maxTokens: 40,
+        maxTokens: 300,       // 1 s de burst @ 300 req/s
         refillRate: 300,      // 300 req/s — 60% do limite máximo (500 req/s)
         refillInterval: 100,
       });
 
-      expect(conservativeLimiter.maxTokens).toBe(40);
+      expect(conservativeLimiter.maxTokens).toBe(300);
       expect(conservativeLimiter.refillRate).toBe(300);
       expect(conservativeLimiter.refillRate).toBeLessThanOrEqual(500); // nunca ultrapassa o teto
 
-      // Consome o burst completo de 40 tokens
-      for (let i = 0; i < 40; i++) {
+      // Consome o burst completo de 300 tokens (1 s @ 300 req/s)
+      for (let i = 0; i < 300; i++) {
         await conservativeLimiter.acquire();
       }
       expect(conservativeLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);

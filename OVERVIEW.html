@@ -475,7 +475,7 @@
 <div class="hero" id="visao">
   <div class="hero-eyebrow">🏭 Fashion Corp · Middleware de Sincronização de Estoque</div>
   <h1>SAP → <em>Middleware</em> → Nuvemshop</h1>
-  <p>O ERP envia rajadas de até 500 notificações por segundo de forma irregular. Este serviço absorve os picos, elimina duplicatas, garante retry automático e entrega cada atualização à Nuvemshop de forma controlada.</p>
+  <p>O ERP envia até 500 notificações por segundo. Este serviço absorve os picos, elimina duplicatas, garante retry automático e entrega cada atualização à Nuvemshop de forma controlada.</p>
 
   <!-- speed comparison -->
   <div class="speed-bar">
@@ -487,7 +487,7 @@
       <div class="arr">›</div>
       <div class="arr">›</div>
       <div class="arr">›</div>
-      <span>rajadas</span>
+      <span>Solicitações</span>
     </div>
     <div class="speed-node mw">
       <div class="label">PCO-Nuvemshop</div>
@@ -497,7 +497,7 @@
       <div class="arr">›</div>
       <div class="arr">›</div>
       <div class="arr">›</div>
-      <span>controlado</span>
+      <span>Controlado</span>
     </div>
     <div class="speed-node ns">
       <div class="label">Nuvemshop</div>
@@ -581,7 +581,7 @@
         <div class="step-dot">5</div>
         <div>
           <div class="step-label">Rate Limiter</div>
-          <div class="step-sublabel">Token Bucket · 40 tokens</div>
+          <div class="step-sublabel">Token Bucket · 500 tokens</div>
         </div>
       </button>
       <button class="step-btn" data-step="5" onclick="goStep(5)">
@@ -697,7 +697,7 @@ redis.setex(<span class="str">`idem:</span><span class="hl">${skuCode}</span><sp
       <!-- Step 4 -->
       <div class="step-content" id="step-4">
         <h3>🎟️ Rate Limiter — Token Bucket</h3>
-        <p class="step-desc">Cada chamada à Nuvemshop consome um "token". O balde tem 40 tokens e repõe 500 por segundo. Se vazio, o worker aguarda pacientemente — sem perder o job.</p>
+        <p class="step-desc">Cada chamada à Nuvemshop consome um "token". O balde tem 500 tokens (= 1 s de burst) e repõe 500 por segundo. Se vazio, o worker aguarda pacientemente — sem perder o job.</p>
 
         <div style="margin-bottom:16px">
           <div style="font-size:13px;color:var(--text-dim);margin-bottom:8px">Balde de tokens atual (simulação):</div>
@@ -711,7 +711,7 @@ redis.setex(<span class="str">`idem:</span><span class="hl">${skuCode}</span><sp
         <div class="step-visual">
           <div class="mono">
 <span class="cmt">// src/rateLimiter.js — Token Bucket</span><br>
-maxTokens  = <span class="num-c">40</span>    <span class="cmt">// capacidade do balde</span><br>
+maxTokens  = <span class="num-c">500</span>   <span class="cmt">// capacidade do balde (= 1 s burst)</span><br>
 refillRate = <span class="num-c">500</span>/s  <span class="cmt">// +500 tokens por segundo</span><br><br>
 <span class="kw">await</span> rateLimiter.<span class="hl">acquire</span>();   <span class="cmt">// aguarda se vazio</span><br>
 <span class="cmt">// após resposta da API:</span><br>
@@ -853,7 +853,7 @@ rateLimiter.<span class="hl">adjustCapacityFromHeader</span>(x-rate-limit-remain
         <p class="text-dim text-sm" style="margin-bottom:12px">Garante que o sistema nunca envie mais requisições do que a Nuvemshop consegue receber. Calibrado para o limite real da plataforma.</p>
         <table class="rule-table">
           <tr><th>Parâmetro</th><th>Valor</th></tr>
-          <tr><td>Capacidade do balde</td><td><span class="tag tag-cyan">40 tokens</span> (configurável via <code>RATE_LIMIT_MAX_TOKENS</code>)</td></tr>
+          <tr><td>Capacidade do balde</td><td><span class="tag tag-cyan">500 tokens</span> (1 s burst — configurável via <code>RATE_LIMIT_MAX_TOKENS</code>)</td></tr>
           <tr><td>Taxa de reposição</td><td><span class="tag tag-cyan">500 tokens/segundo</span> (30.000/min)</td></tr>
           <tr><td>Sem token disponível</td><td><span class="tag tag-yellow">Aguarda</span> — sem perder o job</td></tr>
           <tr><td>Sincronização dinâmica</td><td>Ajusta via header <code>x-rate-limit-remaining</code> a cada resposta</td></tr>
@@ -1064,10 +1064,10 @@ rateLimiter.<span class="hl">adjustCapacityFromHeader</span>(x-rate-limit-remain
         </div>
       </div>
       <div class="file-role">Token Bucket Rate Limiter</div>
-      <div class="file-desc">Implementa o algoritmo Token Bucket calibrado para a Nuvemshop: 40 tokens máx, +500/segundo. Aceita ajuste dinâmico via x-rate-limit-remaining. Fila interna garante zero perda de jobs.</div>
+      <div class="file-desc">Implementa o algoritmo Token Bucket calibrado para a Nuvemshop: 500 tokens máx (1 s burst), +500/segundo. Aceita ajuste dinâmico via x-rate-limit-remaining. Fila interna garante zero perda de jobs.</div>
       <div class="file-tags">
         <span class="tag tag-cyan">Token Bucket</span>
-        <span class="tag tag-green">40 tokens</span>
+        <span class="tag tag-green">500 tokens</span>
         <span class="tag tag-purple">500/s refill</span>
       </div>
     </a>
@@ -1260,8 +1260,8 @@ rateLimiter.<span class="hl">adjustCapacityFromHeader</span>(x-rate-limit-remain
   }
 
   // ── Token bucket simulation ──────────────────────────────────────
-  let tokens = 40;
-  const maxTokens = 40;
+  let tokens = 500;
+  const maxTokens = 500;
 
   function renderBucket() {
     const el = document.getElementById('tokenBucket');

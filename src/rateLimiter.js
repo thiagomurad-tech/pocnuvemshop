@@ -5,7 +5,7 @@
  *
  * Controla o throughput de requisições usando o padrão Token Bucket,
  * calibrado para o Leaky Bucket da Nuvemshop:
- *   - Capacidade padrão: 40 requisições (burst)
+ *   - Capacidade padrão: 500 requisições (burst = 1 s de throughput)
  *   - Taxa de reposição: 500 req/s (drain rate da API)
  *   - Adapta-se dinamicamente ao header x-rate-limit-remaining
  *
@@ -14,12 +14,12 @@
 class TokenBucketRateLimiter {
   /**
    * @param {Object} config
-   * @param {number} config.maxTokens     - Capacidade máxima do balde (padrão: 40 — bucket Nuvemshop)
+   * @param {number} config.maxTokens     - Capacidade máxima do balde (padrão: 500 — bucket Nuvemshop (= 1 s de throughput))
    * @param {number} config.refillRate    - Tokens adicionados por segundo (padrão: 500 — drain Nuvemshop)
    * @param {number} config.refillInterval - Milissegundos entre refills (padrão: 100ms)
    */
   constructor(config = {}) {
-    this.maxTokens = config.maxTokens ?? 40;       // Nuvemshop: bucket de 40 req
+    this.maxTokens = config.maxTokens ?? 500;     // Nuvemshop: bucket = 500 req (1 s de throughput @ 500 req/s)
     this.refillRate = config.refillRate ?? 500;     // Nuvemshop: 500 req/s de drain
     this.refillInterval = config.refillInterval ?? 100; // refill a cada 100ms
     

@@ -51,7 +51,7 @@ SAP ERP (500 req/s)
 | `src/queue.js` | BullMQ Queue factory; jobs retry up to 5× with exponential backoff (2s base) |
 | `src/nuvemshop.js` | Low-level HTTP client — `PUT /products/:id/variants/:id` per variant; used by the worker |
 | `src/nuvemshop-client.js` | Higher-level structured client — supports `PATCH /products/stock-price` (batch up to 50 variants), list/create/update/delete products |
-| `src/rateLimiter.js` | Token Bucket — 100 tokens max, refills at 100/min; dynamically adjusts from `x-rate-limit-remaining` response header |
+| `src/rateLimiter.js` | Token Bucket — 500 tokens max (= 1 s burst), refills at 500/s (30000/min); dynamically adjusts from `x-rate-limit-remaining` response header |
 | `src/idempotency.js` | Redis SETEX — stores SHA-256(`sku_code:stock`) under key `idem:{sku_code}`, TTL from `IDEMPOTENCY_TTL_SECONDS` |
 | `src/logger.js` | Winston — JSON output, writes to `logs/combined.log` and `logs/error.log` |
 
@@ -77,8 +77,8 @@ REDIS_PORT=6379
 PORT=3001
 LOG_LEVEL=info                  # debug | info | warn | error
 IDEMPOTENCY_TTL_SECONDS=300     # dedup window (5 min default)
-RATE_LIMIT_MAX_TOKENS=100       # token bucket capacity
-RATE_LIMIT_REFILL_RATE=100      # tokens refilled per minute
+RATE_LIMIT_MAX_TOKENS=500       # token bucket capacity (burst = 1 s @ 500 req/s)
+RATE_LIMIT_REFILL_RATE=30000    # tokens refilled per minute (30000/60 = 500 req/s)
 NUVEMSHOP_API_BASE_URL=https://api.nuvemshop.com.br/v1   # used by NuvemshopClient
 ```
 
