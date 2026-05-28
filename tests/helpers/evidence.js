@@ -76,7 +76,7 @@ function save(meta = {}) {
 
   const output = {
     run_at:      new Date().toISOString(),
-    environment: 'nuvemshop_real',
+    environment: 'ecommerce_api_real',
     ...meta,
     summary: { total: scenarios.length, passed, failed },
     scenarios,
@@ -147,7 +147,7 @@ function buildHtml(output) {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Evidência E2E — Nuvemshop</title>
+  <title>Evidência E2E — EcommerceAPI</title>
   <style>
     body  { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1100px;margin:0 auto;padding:24px;color:#212529 }
     h1    { border-bottom:2px solid #dee2e6;padding-bottom:10px }
@@ -160,7 +160,7 @@ function buildHtml(output) {
   </style>
 </head>
 <body>
-  <h1>📋 Evidência de Integração — Nuvemshop API</h1>
+  <h1>📋 Evidência de Integração — EcommerceAPI</h1>
 
   <div class="meta">
     <span>📅 <strong>Data:</strong> ${output.run_at}</span>
@@ -188,7 +188,7 @@ function buildHtml(output) {
   <h2>Detalhes por Cenário</h2>
   ${details}
 
-  <footer>Gerado automaticamente · pco-nuvemshop middleware · ${output.run_at}</footer>
+  <footer>Gerado automaticamente · ecommerce-webhook-middleware · ${output.run_at}</footer>
 </body>
 </html>`;
 }

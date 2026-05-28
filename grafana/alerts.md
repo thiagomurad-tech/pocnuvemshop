@@ -1,4 +1,4 @@
-# Alertas Grafana — pco-nuvemshop
+# Alertas Grafana — ecommerce-webhook-middleware
 
 Configuração manual dos alertas no Grafana.  
 Caminho: **Alerting → Alert rules → New alert rule**
@@ -14,17 +14,17 @@ Caminho: **Alerting → Alert rules → New alert rule**
 
 | Campo | Valor |
 |-------|-------|
-| **Name** | `[pco-nuvemshop] DLQ — job sem solução` |
+| **Name** | `[ecommerce-middleware] DLQ — job sem solução` |
 | **Datasource** | Loki |
 | **Evaluate every** | `1m` |
 | **For** | `0m` (dispara imediatamente) |
 | **Severity** | `critical` |
-| **Summary** | `Jobs indo para DLQ no pco-nuvemshop` |
+| **Summary** | `Jobs indo para DLQ no ecommerce-webhook-middleware` |
 | **Description** | `Jobs falharam nos últimos 5 minutos. Verificar painel DLQ no Grafana.` |
 
 **Query (A) — colar no editor Loki:**
 ```
-count_over_time({service="pco-nuvemshop", level="error"} | json | alert="DLQ" [5m])
+count_over_time({service="ecommerce-webhook-middleware", level="error"} | json | alert="DLQ" [5m])
 ```
 
 **Condition:**
@@ -36,21 +36,21 @@ WHEN last() OF A IS ABOVE 0
 
 ## Alerta 2 — Rate limit recorrente (warning)
 
-> Dispara quando a Nuvemshop retorna 429 mais de 10 vezes em 10 minutos.
+> Dispara quando a EcommerceAPI retorna 429 mais de 10 vezes em 10 minutos.
 
 | Campo | Valor |
 |-------|-------|
-| **Name** | `[pco-nuvemshop] Rate limit 429 recorrente` |
+| **Name** | `[ecommerce-middleware] Rate limit 429 recorrente` |
 | **Datasource** | Loki |
 | **Evaluate every** | `2m` |
 | **For** | `2m` |
 | **Severity** | `warning` |
-| **Summary** | `Rate limit 429 recorrente no pco-nuvemshop` |
+| **Summary** | `Rate limit 429 recorrente no ecommerce-webhook-middleware` |
 | **Description** | `Muitas respostas 429 nos últimos 10 minutos. Considerar reduzir RATE_LIMIT_REFILL_RATE.` |
 
 **Query (A) — colar no editor Loki:**
 ```
-count_over_time({service="pco-nuvemshop", level="warn"} | json | msg="Rate limit atingido (429)" [10m])
+count_over_time({service="ecommerce-webhook-middleware", level="warn"} | json | msg="EcommerceAPI rate limit atingido (429)" [10m])
 ```
 
 **Condition:**
@@ -66,17 +66,17 @@ WHEN last() OF A IS ABOVE 10
 
 | Campo | Valor |
 |-------|-------|
-| **Name** | `[pco-nuvemshop] Back-pressure ativo` |
+| **Name** | `[ecommerce-middleware] Back-pressure ativo` |
 | **Datasource** | Loki |
 | **Evaluate every** | `1m` |
 | **For** | `2m` |
 | **Severity** | `warning` |
-| **Summary** | `Back-pressure ativo no rate limiter do pco-nuvemshop` |
+| **Summary** | `Back-pressure ativo no rate limiter do ecommerce-webhook-middleware` |
 | **Description** | `Fila interna do rate limiter com eventos nos últimos 5 min. Workers processando mais rápido do que o bucket permite.` |
 
 **Query (A) — colar no editor Loki:**
 ```
-count_over_time({service="pco-nuvemshop"} | json | msg="Rate limiter com fila de espera — back-pressure ativo" [5m])
+count_over_time({service="ecommerce-webhook-middleware"} | json | msg="Rate limiter com fila de espera — back-pressure ativo" [5m])
 ```
 
 **Condition:**
@@ -92,17 +92,17 @@ WHEN last() OF A IS ABOVE 5
 
 | Campo | Valor |
 |-------|-------|
-| **Name** | `[pco-nuvemshop] Jobs descartados por erro 4xx` |
+| **Name** | `[ecommerce-middleware] Jobs descartados por erro 4xx` |
 | **Datasource** | Loki |
 | **Evaluate every** | `5m` |
 | **For** | `0m` |
 | **Severity** | `warning` |
-| **Summary** | `Jobs descartados por erro 4xx da Nuvemshop (produto ou variante inexistente). Verificar sincronização de cadastro SAP ↔ Nuvemshop.` |
-| **Description** | `Jobs descartados por erro 4xx da Nuvemshop (produto ou variante inexistente). Verificar sincronização de cadastro SAP ↔ Nuvemshop.` |
+| **Summary** | `Jobs descartados por erro 4xx da EcommerceAPI (produto ou variante inexistente). Verificar sincronização de cadastro SAP ↔ EcommerceAPI.` |
+| **Description** | `Jobs descartados por erro 4xx da EcommerceAPI (produto ou variante inexistente). Verificar sincronização de cadastro SAP ↔ EcommerceAPI.` |
 
 **Query (A) — colar no editor Loki:**
 ```
-count_over_time({service="pco-nuvemshop"} | json | msg="Job descartado — erro não-retriável da API Nuvemshop" [15m])
+count_over_time({service="ecommerce-webhook-middleware"} | json | msg="Job descartado — erro não-retriável da EcommerceAPI" [15m])
 ```
 
 **Condition:**
@@ -116,22 +116,22 @@ WHEN last() OF A IS ABOVE 3
 
 ```logql
 # Todos os logs
-{service="pco-nuvemshop"} | json
+{service="ecommerce-webhook-middleware"} | json
 
 # Apenas DLQ
-{service="pco-nuvemshop", level="error"} | json | alert="DLQ"
+{service="ecommerce-webhook-middleware", level="error"} | json | alert="DLQ"
 
 # Apenas 429
-{service="pco-nuvemshop", level="warn"} | json | msg="Rate limit atingido (429)"
+{service="ecommerce-webhook-middleware", level="warn"} | json | msg="EcommerceAPI rate limit atingido (429)"
 
 # Apenas back-pressure
-{service="pco-nuvemshop"} | json | msg="Rate limiter com fila de espera — back-pressure ativo"
+{service="ecommerce-webhook-middleware"} | json | msg="Rate limiter com fila de espera — back-pressure ativo"
 
 # Jobs descartados (4xx)
-{service="pco-nuvemshop"} | json | msg="Job descartado — erro não-retriável da API Nuvemshop"
+{service="ecommerce-webhook-middleware"} | json | msg="Job descartado — erro não-retriável da EcommerceAPI"
 
 # Por SKU específico
-{service="pco-nuvemshop"} | json | skuCode="SKU-POSTMAN-001"
+{service="ecommerce-webhook-middleware"} | json | skuCode="SKU-POSTMAN-001"
 ```
 
 ---

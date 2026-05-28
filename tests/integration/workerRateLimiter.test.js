@@ -3,7 +3,7 @@
 const nock = require('nock');
 const RedisMock = require('ioredis-mock');
 const TokenBucketRateLimiter = require('../../src/rateLimiter');
-const { updateVariantStock } = require('../../src/nuvemshop');
+const { updateVariantStock } = require('../../src/ecommerce-api');
 const { isDuplicate } = require('../../src/idempotency');
 
 jest.mock('../../src/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }));
@@ -29,10 +29,10 @@ describe('WorkerRateLimiterIntegration', () => {
   });
 
   test('simula fluxo completo: rate limiter + idempotência + API call', async () => {
-    const originalSleep = require('../../src/nuvemshop').sleep;
-    require('../../src/nuvemshop').sleep = jest.fn().mockResolvedValue(undefined);
+    const originalSleep = require('../../src/ecommerce-api').sleep;
+    require('../../src/ecommerce-api').sleep = jest.fn().mockResolvedValue(undefined);
 
-    // Limiter com parâmetros reais da Nuvemshop: bucket=500, drain=500 req/s
+    // Limiter com parâmetros reais da EcommerceAPI: bucket=500, drain=500 req/s
     limiter.destroy();
     limiter = new TokenBucketRateLimiter({
       maxTokens: 500,
@@ -43,10 +43,10 @@ describe('WorkerRateLimiterIntegration', () => {
     const skuCode = 'TSHIRT-XL';
     const qty = 100;
     const S = 'store-123', P = 'proc-456', V = 'var-789';
-    const PATH = `/2025-03/${S}/products/${P}/variants/stock`;
+    const PATH = `/v1/${S}/products/${P}/variants/stock`;
 
     // Setup nock — retorna 32 remaining (dentro do bucket de 500)
-    nock('https://api.nuvemshop.com.br')
+    nock('https://api.ecommerce.example.com')
       .post(PATH, { action: 'replace', value: qty, id: V })
       .reply(200, { id: parseInt(V), sku: skuCode, stock: qty }, { 'x-rate-limit-remaining': '32' });
 
@@ -84,12 +84,12 @@ describe('WorkerRateLimiterIntegration', () => {
     expect(result.data.stock).toBe(qty);
     expect(nock.isDone()).toBe(true);
 
-    require('../../src/nuvemshop').sleep = originalSleep;
+    require('../../src/ecommerce-api').sleep = originalSleep;
   });
 
   test('rate limiting previne burst de requisições', async () => {
-    const originalSleep = require('../../src/nuvemshop').sleep;
-    require('../../src/nuvemshop').sleep = jest.fn().mockResolvedValue(undefined);
+    const originalSleep = require('../../src/ecommerce-api').sleep;
+    require('../../src/ecommerce-api').sleep = jest.fn().mockResolvedValue(undefined);
 
     // Limiter com apenas 3 tokens
     const smallLimiter = new TokenBucketRateLimiter({
@@ -121,14 +121,14 @@ describe('WorkerRateLimiterIntegration', () => {
 
     await fourthPromise;
     smallLimiter.destroy();
-    require('../../src/nuvemshop').sleep = originalSleep;
+    require('../../src/ecommerce-api').sleep = originalSleep;
   });
 
-  test('rate limiter resync com Nuvemshop após muitas requisições', async () => {
-    const originalSleep = require('../../src/nuvemshop').sleep;
-    require('../../src/nuvemshop').sleep = jest.fn().mockResolvedValue(undefined);
+  test('rate limiter resync com EcommerceAPI após muitas requisições', async () => {
+    const originalSleep = require('../../src/ecommerce-api').sleep;
+    require('../../src/ecommerce-api').sleep = jest.fn().mockResolvedValue(undefined);
 
-    // Simula comportamento real: limiter começa com 500 tokens (bucket Nuvemshop)
+    // Simula comportamento real: limiter começa com 500 tokens (bucket EcommerceAPI)
     // API pode retornar valores menores baseado no uso compartilhado
     const prodLimiter = new TokenBucketRateLimiter({
       maxTokens: 500,
@@ -148,6 +148,6 @@ describe('WorkerRateLimiterIntegration', () => {
     expect(prodLimiter.getStatus().tokens).toBeCloseTo(19, 0.5);
 
     prodLimiter.destroy();
-    require('../../src/nuvemshop').sleep = originalSleep;
+    require('../../src/ecommerce-api').sleep = originalSleep;
   });
 });

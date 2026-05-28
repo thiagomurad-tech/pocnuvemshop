@@ -1,7 +1,7 @@
 'use strict';
 
 const nock = require('nock');
-const NuvemshopClient = require('../../src/nuvemshop-client');
+const EcommerceClient = require('../../src/ecommerce-client');
 
 jest.mock('../../src/logger', () => ({
   info: jest.fn(),
@@ -10,15 +10,15 @@ jest.mock('../../src/logger', () => ({
   debug: jest.fn(),
 }));
 
-describe('NuvemshopClient', () => {
+describe('EcommerceClient', () => {
   const STORE_ID = 'test-store-id';
   const TOKEN    = 'test-access-token';
-  const API_URL  = 'https://api.nuvemshop.com.br/2025-03';
+  const API_URL  = 'https://api.ecommerce.example.com/v1';
 
   let client;
 
   beforeEach(() => {
-    client = new NuvemshopClient({
+    client = new EcommerceClient({
       storeId: STORE_ID,
       accessToken: TOKEN,
       apiBaseUrl: API_URL,
@@ -32,8 +32,8 @@ describe('NuvemshopClient', () => {
   });
 
   test('construtor valida credenciais obrigatórias', () => {
-    expect(() => new NuvemshopClient({ storeId: '123' })).toThrow('storeId e accessToken são obrigatórios');
-    expect(() => new NuvemshopClient({ accessToken: 'token' })).toThrow('storeId e accessToken são obrigatórios');
+    expect(() => new EcommerceClient({ storeId: '123' })).toThrow('storeId e accessToken são obrigatórios');
+    expect(() => new EcommerceClient({ accessToken: 'token' })).toThrow('storeId e accessToken são obrigatórios');
   });
 
   test('GET /products retorna lista de produtos', async () => {
@@ -271,27 +271,27 @@ describe('NuvemshopClient', () => {
   test('construtor lê variáveis de ambiente', () => {
     nock.enableNetConnect(); // Permitir sem nock para este teste
 
-    const prevStore = process.env.NUVEMSHOP_STORE_ID;
-    const prevToken = process.env.NUVEMSHOP_ACCESS_TOKEN;
-    const prevUrl = process.env.NUVEMSHOP_API_BASE_URL;
+    const prevStore = process.env.STORE_ID;
+    const prevToken = process.env.ACCESS_TOKEN;
+    const prevUrl = process.env.API_BASE_URL;
 
-    process.env.NUVEMSHOP_STORE_ID = 'env-store';
-    process.env.NUVEMSHOP_ACCESS_TOKEN = 'env-token';
-    process.env.NUVEMSHOP_API_BASE_URL = 'https://api.env.test/v1';
+    process.env.STORE_ID = 'env-store';
+    process.env.ACCESS_TOKEN = 'env-token';
+    process.env.API_BASE_URL = 'https://api.env.test/v1';
 
-    const envClient = new NuvemshopClient({});
+    const envClient = new EcommerceClient({});
 
     expect(envClient.storeId).toBe('env-store');
     expect(envClient.accessToken).toBe('env-token');
     expect(envClient.apiBaseUrl).toBe('https://api.env.test/v1');
 
     // Restaurar valores anteriores
-    if (prevStore) process.env.NUVEMSHOP_STORE_ID = prevStore;
-    else delete process.env.NUVEMSHOP_STORE_ID;
-    if (prevToken) process.env.NUVEMSHOP_ACCESS_TOKEN = prevToken;
-    else delete process.env.NUVEMSHOP_ACCESS_TOKEN;
-    if (prevUrl) process.env.NUVEMSHOP_API_BASE_URL = prevUrl;
-    else delete process.env.NUVEMSHOP_API_BASE_URL;
+    if (prevStore) process.env.STORE_ID = prevStore;
+    else delete process.env.STORE_ID;
+    if (prevToken) process.env.ACCESS_TOKEN = prevToken;
+    else delete process.env.ACCESS_TOKEN;
+    if (prevUrl) process.env.API_BASE_URL = prevUrl;
+    else delete process.env.API_BASE_URL;
 
     nock.disableNetConnect();
   });

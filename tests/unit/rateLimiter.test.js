@@ -22,7 +22,7 @@ describe('TokenBucketRateLimiter', () => {
       expect(limiter.getStatus().tokens).toBe(10);
     });
 
-    test('usa valores padrão calibrados para Nuvemshop (bucket=500, drain=500 req/s)', () => {
+    test('usa valores padrão calibrados para EcommerceAPI (bucket=500, drain=500 req/s)', () => {
       const defaultLimiter = new TokenBucketRateLimiter();
       expect(defaultLimiter.maxTokens).toBe(500);  // bucket = 1 s de throughput @ 500 req/s
       expect(defaultLimiter.refillRate).toBe(500);  // 500 req/s drain
@@ -188,35 +188,35 @@ describe('TokenBucketRateLimiter', () => {
     });
   });
 
-  describe('cenário real: Nuvemshop rate limit (bucket=500, drain=500 req/s)', () => {
+  describe('cenário real: EcommerceAPI rate limit (bucket=500, drain=500 req/s)', () => {
     test('esgota burst de 500 requisições e enfileira a 501ª', async () => {
-      const nuvemshopLimiter = new TokenBucketRateLimiter({
+      const apiLimiter = new TokenBucketRateLimiter({
         maxTokens: 500,
-        refillRate: 500,      // 500 req/s — drain real da Nuvemshop
+        refillRate: 500,      // 500 req/s — drain real da EcommerceAPI
         refillInterval: 100,
       });
 
       // Consome burst capacity completo (500 tokens = 1 s de throughput)
       for (let i = 0; i < 500; i++) {
-        await nuvemshopLimiter.acquire();
+        await apiLimiter.acquire();
       }
-      expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
-      expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(0);
+      expect(apiLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
+      expect(apiLimiter.getStatus().waitingRequests).toBe(0);
 
       // 501ª requisição entra em fila (sem tokens disponíveis)
-      const nextReq = nuvemshopLimiter.acquire();
-      expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(1);
+      const nextReq = apiLimiter.acquire();
+      expect(apiLimiter.getStatus().waitingRequests).toBe(1);
 
       // Header x-rate-limit-remaining sincroniza o bucket — resolve imediatamente
-      nuvemshopLimiter.adjustCapacityFromHeader(20);
+      apiLimiter.adjustCapacityFromHeader(20);
       await nextReq;
-      expect(nuvemshopLimiter.getStatus().waitingRequests).toBe(0);
+      expect(apiLimiter.getStatus().waitingRequests).toBe(0);
 
-      nuvemshopLimiter.destroy();
+      apiLimiter.destroy();
     });
 
     test('reposição a 500 req/s após burst esgotado', async () => {
-      const nuvemshopLimiter = new TokenBucketRateLimiter({
+      const apiLimiter = new TokenBucketRateLimiter({
         maxTokens: 500,
         refillRate: 500,
         refillInterval: 50,
@@ -224,22 +224,22 @@ describe('TokenBucketRateLimiter', () => {
 
       // Esgota todos os tokens
       for (let i = 0; i < 500; i++) {
-        await nuvemshopLimiter.acquire();
+        await apiLimiter.acquire();
       }
-      expect(nuvemshopLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
+      expect(apiLimiter.getStatus().tokens).toBeCloseTo(0, 0.5);
 
       // Após 200ms a 500 req/s: 500 × 0.2s = 100 tokens gerados (abaixo do cap de 500)
       // Piso em 60 para absorver variância de timing (refill a cada 50ms, ≥ 2 ciclos garantidos)
       await new Promise(resolve => setTimeout(resolve, 200));
-      expect(nuvemshopLimiter.getStatus().tokens).toBeGreaterThanOrEqual(60);
-      expect(nuvemshopLimiter.getStatus().tokens).toBeLessThanOrEqual(500);
+      expect(apiLimiter.getStatus().tokens).toBeGreaterThanOrEqual(60);
+      expect(apiLimiter.getStatus().tokens).toBeLessThanOrEqual(500);
 
-      nuvemshopLimiter.destroy();
+      apiLimiter.destroy();
     });
 
     test('configuração conservadora (300 req/s, 300 tokens) — abaixo do limite máximo de 500 req/s', async () => {
       // maxTokens = refillRate = 300 mantém a semântica de "1 s de burst".
-      // O sistema NUNCA deve ser configurado com refillRate > 500 (limite máximo da Nuvemshop).
+      // O sistema NUNCA deve ser configurado com refillRate > 500 (limite máximo da EcommerceAPI).
       const conservativeLimiter = new TokenBucketRateLimiter({
         maxTokens: 300,       // 1 s de burst @ 300 req/s
         refillRate: 300,      // 300 req/s — 60% do limite máximo (500 req/s)

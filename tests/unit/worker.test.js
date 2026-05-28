@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Testes unitários do worker — foco no tratamento de erros da API Nuvemshop.
+ * Testes unitários do worker — foco no tratamento de erros da API EcommerceAPI.
  *
  * O worker é testado indiretamente: instanciamos a função processadora
  * isolada (sem BullMQ real), mockando todas as dependências externas.
@@ -38,7 +38,7 @@ function makeJob(overrides = {}) {
 
 // ── Setup: isola módulos para cada teste ─────────────────────────────────────
 let updateVariantStock;
-let NuvemshopApiError;
+let EcommerceApiError;
 let isDuplicate;
 let processFn; // função interna do worker extraída para teste
 
@@ -46,11 +46,11 @@ beforeEach(() => {
   jest.resetModules();
 
   // Re-importa após reset para garantir mocks frescos
-  ({ updateVariantStock, NuvemshopApiError } = require('../../src/nuvemshop'));
+  ({ updateVariantStock, EcommerceApiError } = require('../../src/ecommerce-api'));
   ({ isDuplicate } = require('../../src/idempotency'));
 
   jest.spyOn(require('../../src/idempotency'), 'isDuplicate').mockResolvedValue(false);
-  jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock');
+  jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock');
 });
 
 afterEach(() => {
@@ -60,9 +60,9 @@ afterEach(() => {
 // ── Fábrica da função processadora ───────────────────────────────────────────
 // Replica a lógica do worker sem precisar do BullMQ real
 async function runWorkerLogic(job) {
-  const { NuvemshopApiError: ApiError } = require('../../src/nuvemshop');
+  const { EcommerceApiError: ApiError } = require('../../src/ecommerce-api');
   const { isDuplicate: isdup }          = require('../../src/idempotency');
-  const { updateVariantStock: update }  = require('../../src/nuvemshop');
+  const { updateVariantStock: update }  = require('../../src/ecommerce-api');
 
   const { skuCode, productId, variantId, stock } = job.data;
   const ctx = {
@@ -82,7 +82,7 @@ async function runWorkerLogic(job) {
   } catch (err) {
     if (err instanceof ApiError && !err.retryable) {
       logger.warn({
-        msg:      'Job descartado — erro não-retriável da API Nuvemshop',
+        msg:      'Job descartado — erro não-retriável da API EcommerceAPI',
         status:   err.statusCode,
         api_body: err.body,
         ...ctx,
@@ -102,8 +102,8 @@ describe('Worker — erros não-retriáveis (4xx)', () => {
   test.each(NON_RETRYABLE)(
     'status %i → descarta job sem retry (retorna discarded: true)',
     async (statusCode) => {
-      const { NuvemshopApiError: ApiError } = require('../../src/nuvemshop');
-      jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock')
+      const { EcommerceApiError: ApiError } = require('../../src/ecommerce-api');
+      jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock')
         .mockRejectedValue(new ApiError(`Erro ${statusCode}`, statusCode, `{"code":${statusCode}}`));
 
       const result = await runWorkerLogic(makeJob());
@@ -111,7 +111,7 @@ describe('Worker — erros não-retriáveis (4xx)', () => {
       expect(result).toMatchObject({ discarded: true, reason: 'non_retryable', statusCode });
       expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
-          msg:    'Job descartado — erro não-retriável da API Nuvemshop',
+          msg:    'Job descartado — erro não-retriável da API EcommerceAPI',
           status: statusCode,
         })
       );
@@ -119,8 +119,8 @@ describe('Worker — erros não-retriáveis (4xx)', () => {
   );
 
   test('404 — não lança erro (BullMQ não retenta)', async () => {
-    const { NuvemshopApiError: ApiError } = require('../../src/nuvemshop');
-    jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock')
+    const { EcommerceApiError: ApiError } = require('../../src/ecommerce-api');
+    jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock')
       .mockRejectedValue(new ApiError('Erro 404', 404, '{"code":404}'));
 
     // Se lançasse, o await rejeitaria
@@ -129,24 +129,24 @@ describe('Worker — erros não-retriáveis (4xx)', () => {
 });
 
 describe('Worker — erros retriáveis propagam para BullMQ retentar', () => {
-  test('NuvemshopApiError 429 → relança erro (BullMQ retenta)', async () => {
-    const { NuvemshopApiError: ApiError } = require('../../src/nuvemshop');
-    jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock')
+  test('EcommerceApiError 429 → relança erro (BullMQ retenta)', async () => {
+    const { EcommerceApiError: ApiError } = require('../../src/ecommerce-api');
+    jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock')
       .mockRejectedValue(new ApiError('Erro 429', 429, ''));
 
     await expect(runWorkerLogic(makeJob())).rejects.toThrow(ApiError);
   });
 
-  test('NuvemshopApiError 503 → relança erro (BullMQ retenta)', async () => {
-    const { NuvemshopApiError: ApiError } = require('../../src/nuvemshop');
-    jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock')
+  test('EcommerceApiError 503 → relança erro (BullMQ retenta)', async () => {
+    const { EcommerceApiError: ApiError } = require('../../src/ecommerce-api');
+    jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock')
       .mockRejectedValue(new ApiError('Erro 503', 503, ''));
 
     await expect(runWorkerLogic(makeJob())).rejects.toThrow(ApiError);
   });
 
   test('erro de rede (TypeError) → relança erro (BullMQ retenta)', async () => {
-    jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock')
+    jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock')
       .mockRejectedValue(new TypeError('fetch failed'));
 
     await expect(runWorkerLogic(makeJob())).rejects.toThrow(TypeError);
@@ -156,7 +156,7 @@ describe('Worker — erros retriáveis propagam para BullMQ retentar', () => {
 describe('Worker — job duplicado descartado antes da API', () => {
   test('isDuplicate true → retorna skipped sem chamar a API', async () => {
     jest.spyOn(require('../../src/idempotency'), 'isDuplicate').mockResolvedValue(true);
-    const spy = jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock');
+    const spy = jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock');
 
     const result = await runWorkerLogic(makeJob());
 
@@ -167,7 +167,7 @@ describe('Worker — job duplicado descartado antes da API', () => {
 
 describe('Worker — sucesso', () => {
   test('API retorna 200 → retorna success com stock', async () => {
-    jest.spyOn(require('../../src/nuvemshop'), 'updateVariantStock')
+    jest.spyOn(require('../../src/ecommerce-api'), 'updateVariantStock')
       .mockResolvedValue({ data: { stock: 10 }, headers: { rateLimitRemaining: 39 } });
 
     const result = await runWorkerLogic(makeJob());

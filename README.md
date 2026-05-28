@@ -1,11 +1,11 @@
-# pco-nuvemshop — Middleware de Estoque SAP → Nuvemshop
+# ecommerce-webhook-middleware
 
-Middleware de sincronização de estoque entre o SAP ERP da Fashion Corp e a plataforma Nuvemshop Next.
+Middleware de sincronização de estoque entre um SAP ERP e uma plataforma de e-commerce.
 
 ## Contexto
 
 O SAP envia webhooks de estoque sem controle de vazão (até 500 req/s).  
-Este middleware absorve os picos, elimina duplicatas e entrega as atualizações à Nuvemshop respeitando o rate limit da plataforma (bucket de 500 req (1 s burst), 500 req/s).
+Este middleware absorve os picos, elimina duplicatas e entrega as atualizações à EcommerceAPI respeitando o rate limit da plataforma (bucket de 500 req (1 s burst), 500 req/s).
 
 ## Arquitetura
 
@@ -16,7 +16,7 @@ SAP ERP (500 req/s)
               └─► src/worker.js   Consome fila (concorrência=10)
                     ├─► Idempotência   SHA-256(sku:stock) — descarta duplicatas
                     ├─► Rate Limiter   Token Bucket — sincroniza com x-rate-limit-remaining
-                    └─► src/nuvemshop.js → POST /products/:id/variants/stock
+                    └─► src/ecommerce-api.js → POST /products/:id/variants/stock
                           └─► DLQ   Jobs falhos após 5 tentativas (BullMQ nativo)
 ```
 
@@ -39,20 +39,21 @@ sudo apt update && sudo apt install redis-server && sudo systemctl start redis
 ## Instalação
 
 ```bash
-git clone https://github.com/thiagomurad-tech/pocnuvemshop.git
-cd pocnuvemshop
+git clone <repo-url>
+cd ecommerce-webhook-middleware
 npm install
 cp .env.example .env
-# Editar .env com suas credenciais Nuvemshop
+# Editar .env com suas credenciais
 ```
 
 ## Configuração (.env)
 
 ```dotenv
-# Nuvemshop
-NUVEMSHOP_STORE_ID=<seu_store_id>
-NUVEMSHOP_ACCESS_TOKEN=<seu_access_token>
-NUVEMSHOP_API_BASE_URL=https://api.nuvemshop.com.br/2025-03
+# EcommerceAPI
+STORE_ID=<seu_store_id>
+ACCESS_TOKEN=<seu_access_token>
+API_BASE_URL=https://api.ecommerce.example.com
+API_VERSION=v1
 
 # Redis
 REDIS_HOST=localhost
@@ -65,7 +66,7 @@ LOG_LEVEL=info                   # debug | info | warn | error
 # Idempotência
 IDEMPOTENCY_TTL_SECONDS=300      # janela de dedup (5 min)
 
-# Rate limiter — Leaky Bucket Nuvemshop
+# Rate limiter
 RATE_LIMIT_MAX_TOKENS=500        # capacidade do bucket (burst = 1 s de throughput)
 RATE_LIMIT_REFILL_RATE=30000     # req/min (÷60 = 500 req/s)
 
@@ -124,7 +125,7 @@ Liveness check básico do processo.
 
 ### `GET /health/queue`
 
-Estado detalhado da fila BullMQ. Use este endpoint em monitors de uptime (Grafana, Datadog, UptimeRobot) — retorna **HTTP 503** quando o status for `critical`, disparando alertas antes que o cliente perceba.
+Estado detalhado da fila BullMQ. Retorna **HTTP 503** quando o status for `critical`.
 
 **Resposta 200 — healthy:**
 ```json
@@ -151,23 +152,13 @@ Estado detalhado da fila BullMQ. Use este endpoint em monitors de uptime (Grafan
 ```json
 {
   "status": "critical",
-  "queue": { "waiting": 15200, "failed": 130, ... },
+  "queue": { "waiting": 15200, "failed": 130 },
   "alerts": [
     "fila crítica: 15200 jobs aguardando (limite: 10000)",
     "DLQ crítica: 130 jobs com falha (limite: 100)"
   ]
 }
 ```
-
-**Campos da fila:**
-
-| Campo | Descrição |
-|-------|-----------|
-| `waiting` | Enfileirados, aguardando um worker livre |
-| `active` | Sendo processados agora |
-| `delayed` | Em backoff — aguardando retry após 429/5xx |
-| `failed` | Na DLQ — tentativas esgotadas, requer atenção |
-| `completed` | Concluídos na última hora |
 
 **Tabela de status:**
 
@@ -196,7 +187,7 @@ npx jest tests/unit/rateLimiter.test.js --runInBand
 npm test -- --testPathPattern="webhook"
 ```
 
-### Testes E2E — API real Nuvemshop
+### Testes E2E — API real
 
 Requer Redis local e credenciais reais no `.env`.
 
@@ -217,16 +208,15 @@ Ao final gera artefatos de evidência em `reports/` (gitignored):
 - `evidence-<timestamp>.json` — payload, resposta e assertions por cenário
 - `evidence-<timestamp>.html` — relatório visual com detalhes colapsáveis
 
-## Quirks da API Nuvemshop
+## Quirks da EcommerceAPI
 
 | Item | Detalhe |
 |------|---------|
 | Autenticação | Header `Authentication: bearer <token>` — **não** `Authorization` |
-| Endpoint de estoque | `POST /2025-03/{store_id}/products/{product_id}/variants/stock` |
+| Endpoint de estoque | `POST /{api_version}/{store_id}/products/{product_id}/variants/stock` |
 | Body obrigatório | `{ "action": "replace", "value": <qty>, "id": "<variant_id>" }` |
 | Rate limit | bucket=500 req (1 s burst), drain=500 req/s |
 | Header de controle | `x-rate-limit-remaining` e `x-rate-limit-reset` (ms) |
-| User-Agent | Obrigatório — formato: `NomeDaApp (email@parceiro.com)` |
 
 ## Observabilidade
 
@@ -243,57 +233,37 @@ Campos fixos para filtro:
 | `alert: "DLQ"` | Job esgotou tentativas | Alerta crítico |
 | `msg: "duplicata"` | Evento idempotente descartado | Métricas de dedup |
 | `msg: "back-pressure ativo"` | Fila do rate limiter > 0 | Alerta de saturação |
-| `msg: "Job descartado"` | Erro 4xx não-retriável (ex: 404) | Produto inexistente na Nuvemshop |
+| `msg: "Job descartado"` | Erro 4xx não-retriável (ex: 404) | Produto inexistente na EcommerceAPI |
 
 ### Grafana Loki
 
-O serviço envia logs diretamente ao Loki via HTTP quando `LOKI_HOST` está definido no `.env` — sem necessidade de Promtail ou agente externo.
-
-**Configuração:**
-```dotenv
-LOKI_HOST=http://localhost:3100
-```
-
-Ao iniciar, o processo confirma a integração:
-```
-[Logger] Loki transport ativo → http://localhost:3100
-```
-
-**Labels dos streams** (usados para filtrar no Grafana):
-
-| Label | Valores |
-|-------|---------|
-| `service` | `pco-nuvemshop` |
-| `level` | `info` \| `warn` \| `error` |
-| `env` | `development` \| `production` |
+O serviço envia logs diretamente ao Loki via HTTP quando `LOKI_HOST` está definido no `.env`.
 
 **Queries LogQL prontas:**
 
 ```logql
 # Todos os logs do serviço
-{service="pco-nuvemshop"} | json
+{service="ecommerce-webhook-middleware"} | json
 
 # Alertas DLQ (job sem solução após 5 tentativas)
-{service="pco-nuvemshop", level="error"} | json | alert="DLQ"
+{service="ecommerce-webhook-middleware", level="error"} | json | alert="DLQ"
 
 # Rate limit atingido (429)
-{service="pco-nuvemshop", level="warn"} | json | msg="Rate limit atingido (429)"
+{service="ecommerce-webhook-middleware", level="warn"} | json | msg="EcommerceAPI rate limit atingido (429)"
 
 # Jobs descartados por produto inexistente (404)
-{service="pco-nuvemshop"} | json | status=404
+{service="ecommerce-webhook-middleware"} | json | status=404
 
 # Back-pressure na fila do rate limiter
-{service="pco-nuvemshop"} | json | queue_depth > 0
+{service="ecommerce-webhook-middleware"} | json | queue_depth > 0
 
 # Rastrear um SKU específico
-{service="pco-nuvemshop"} | json | skuCode="SKU-POSTMAN-001"
+{service="ecommerce-webhook-middleware"} | json | skuCode="SKU-POSTMAN-001"
 ```
 
 ### Monitoramento ativo da fila
 
-Configure um monitor de uptime apontando para `GET /health/queue`. Quando a fila travar, o endpoint retorna HTTP 503 automaticamente — o monitor dispara o alerta sem necessidade de parsing de logs.
-
-Thresholds embutidos no endpoint:
+Configure um monitor de uptime apontando para `GET /health/queue`. Quando a fila travar, o endpoint retorna HTTP 503 automaticamente.
 
 | Métrica | Degraded | Critical (→ 503) | Ação recomendada |
 |---------|----------|-------------------|------------------|

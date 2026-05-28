@@ -2,17 +2,17 @@
 
 const logger = require('./logger');
 
-const BASE_URL      = 'https://api.nuvemshop.com.br';
-const API_VERSION   = '2025-03';
-const USER_AGENT    = 'FashionCorp-Middleware (ti@fashioncorp.com.br)';
+const BASE_URL      = process.env.API_BASE_URL    || 'https://api.ecommerce.example.com';
+const API_VERSION   = process.env.API_VERSION     || 'v1';
+const USER_AGENT    = 'ERPClient-Middleware';
 const MAX_RETRIES   = 5;
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS  = 64_000;
 
-class NuvemshopApiError extends Error {
+class EcommerceApiError extends Error {
   constructor(message, statusCode, responseBody) {
     super(message);
-    this.name       = 'NuvemshopApiError';
+    this.name       = 'EcommerceApiError';
     this.statusCode = statusCode;
     this.body       = responseBody;
     this.retryable  = statusCode === 429 || statusCode >= 500;
@@ -54,7 +54,7 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
       });
     } catch (networkErr) {
       logger.error({
-        msg:       'Falha de rede ao chamar Nuvemshop',
+        msg:       'Falha de rede ao chamar EcommerceAPI',
         err:       networkErr.message,
         err_stack: networkErr.stack,
         attempt,
@@ -71,7 +71,7 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
     const rateLimitResetMs   = parseInt(res.headers.get('x-rate-limit-reset')     ?? '0',  10);
 
     logger.debug({
-      msg: 'Resposta Nuvemshop recebida',
+      msg: 'Resposta EcommerceAPI recebida',
       status:               res.status,
       rate_limit_remaining: rateLimitRemaining,
       rate_limit_reset_ms:  rateLimitResetMs,
@@ -97,7 +97,7 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
       if (attempt >= MAX_RETRIES) break;
       const wait_ms = computeDelay(attempt, rateLimitResetMs);
       logger.warn({
-        msg:                 'Rate limit atingido (429) — aguardando antes de retentar',
+        msg:                 'EcommerceAPI rate limit atingido (429) — aguardando antes de retentar',
         wait_ms,
         attempt,
         rate_limit_reset_ms: rateLimitResetMs,
@@ -113,7 +113,7 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
       if (attempt >= MAX_RETRIES) break;
       const wait_ms = computeDelay(attempt, 0);
       logger.warn({
-        msg:          'Erro no servidor Nuvemshop (5xx) — retentando',
+        msg:          'Erro no servidor EcommerceAPI (5xx) — retentando',
         status:       res.status,
         wait_ms,
         attempt,
@@ -127,12 +127,12 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
 
     const body = await res.text();
     logger.error({
-      msg:    'Erro não-retentável na API Nuvemshop',
+      msg:    'Erro não-retentável na EcommerceAPI',
       status: res.status,
       body,
       ...ctx,
     });
-    throw new NuvemshopApiError(`Erro ${res.status}`, res.status, body);
+    throw new EcommerceApiError(`Erro ${res.status}`, res.status, body);
   }
 
   logger.error({
@@ -143,4 +143,4 @@ async function updateVariantStock({ storeId, productId, variantId, stock, access
   throw new MaxRetriesExceededError(MAX_RETRIES + 1);
 }
 
-module.exports = { updateVariantStock, NuvemshopApiError, MaxRetriesExceededError, computeDelay, sleep };
+module.exports = { updateVariantStock, EcommerceApiError, MaxRetriesExceededError, computeDelay, sleep };

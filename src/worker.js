@@ -7,7 +7,7 @@ const Redis      = require('ioredis');
 
 const logger                        = require('./logger');
 const { isDuplicate }               = require('./idempotency');
-const { updateVariantStock, NuvemshopApiError } = require('./nuvemshop');
+const { updateVariantStock, EcommerceApiError } = require('./ecommerce-api');
 const { QUEUE_NAME }                = require('./queue');
 const TokenBucketRateLimiter        = require('./rateLimiter');
 
@@ -17,7 +17,7 @@ const redis = new Redis({
   maxRetriesPerRequest: null,
 });
 
-// Rate limiter calibrado para o Leaky Bucket real da Nuvemshop:
+// Rate limiter calibrado para o Leaky Bucket da EcommerceAPI:
 //   bucket = 500 requisições (= 1 s de throughput @ 500 req/s), drain = 500 req/s
 // RATE_LIMIT_REFILL_RATE é em req/min (dividido por 60 para obter req/s)
 const rateLimiter = new TokenBucketRateLimiter({
@@ -64,7 +64,7 @@ const worker = new Worker(
 
     await rateLimiter.acquire();
     logger.debug({
-      msg:              'Token adquirido, chamando Nuvemshop',
+      msg:              'Token adquirido, chamando EcommerceAPI',
       rate_limiter:     rateLimiter.getStatus(),
       ...ctx,
     });
@@ -73,15 +73,15 @@ const worker = new Worker(
     let result;
     try {
       result = await updateVariantStock({
-        storeId:     process.env.NUVEMSHOP_STORE_ID,
-        accessToken: process.env.NUVEMSHOP_ACCESS_TOKEN,
+        storeId:     process.env.STORE_ID,
+        accessToken: process.env.ACCESS_TOKEN,
         productId, variantId, stock, skuCode,
       });
     } catch (err) {
       // Erros não-retriáveis (404, 422, 400, 401, 403): descarta o job sem retry
-      if (err instanceof NuvemshopApiError && !err.retryable) {
+      if (err instanceof EcommerceApiError && !err.retryable) {
         logger.warn({
-          msg:        'Job descartado — erro não-retriável da API Nuvemshop',
+          msg:        'Job descartado — erro não-retriável da EcommerceAPI',
           status:     err.statusCode,
           api_body:   err.body,
           ...ctx,

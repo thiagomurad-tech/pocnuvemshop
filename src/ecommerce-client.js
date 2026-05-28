@@ -3,29 +3,29 @@
 const logger = require('./logger');
 
 /**
- * Cliente estruturado para API Nuvemshop
+ * Cliente estruturado para EcommerceAPI
  *
  * Gerencia autenticação, rate limiting e requisições da API
  * com tratamento de erros robusto.
  */
-class NuvemshopClient {
+class EcommerceClient {
   /**
    * @param {Object} config - Configuração do cliente
    * @param {string} config.storeId - ID da loja (ex: 123456)
    * @param {string} config.accessToken - Token de acesso Bearer
-   * @param {string} config.apiBaseUrl - URL base da API (ex: https://api.nuvemshop.com.br/2025-03)
+   * @param {string} config.apiBaseUrl - URL base da API (ex: https://api.ecommerce.example.com/v1)
    * @param {number} config.maxRetries - Máx tentativas (padrão: 5)
    * @param {number} config.retryDelayMs - Atraso inicial em ms (padrão: 1000)
    */
   constructor(config) {
-    this.storeId = config.storeId || process.env.NUVEMSHOP_STORE_ID;
-    this.accessToken = config.accessToken || process.env.NUVEMSHOP_ACCESS_TOKEN;
-    this.apiBaseUrl = config.apiBaseUrl || process.env.NUVEMSHOP_API_BASE_URL || 'https://api.nuvemshop.com.br/2025-03';
+    this.storeId = config.storeId || process.env.STORE_ID;
+    this.accessToken = config.accessToken || process.env.ACCESS_TOKEN;
+    this.apiBaseUrl = config.apiBaseUrl || process.env.API_BASE_URL || 'https://api.ecommerce.example.com/v1';
     this.maxRetries = config.maxRetries || 5;
     this.retryDelayMs = config.retryDelayMs || 1000;
 
     if (!this.storeId || !this.accessToken) {
-      throw new Error('NuvemshopClient: storeId e accessToken são obrigatórios');
+      throw new Error('EcommerceClient: storeId e accessToken são obrigatórios');
     }
 
     this.baseUrl = `${this.apiBaseUrl}/${this.storeId}`;
@@ -75,7 +75,7 @@ class NuvemshopClient {
         }
 
         logger.debug({
-          msg: 'Nuvemshop API request',
+          msg: 'EcommerceAPI request',
           method,
           endpoint,
           attempt,
@@ -92,17 +92,17 @@ class NuvemshopClient {
         if (response.status === 429) {
           if (attempt >= this.maxRetries) {
             logger.error({
-              msg: 'Nuvemshop rate limit máximo atingido',
+              msg: 'EcommerceAPI rate limit máximo atingido',
               endpoint,
               status: response.status,
               ...this.ctx,
             });
-            throw new Error('Nuvemshop: limite de requisições atingido após múltiplas tentativas');
+            throw new Error('EcommerceAPI: limite de requisições atingido após múltiplas tentativas');
           }
 
           const delay = this._computeDelay(attempt);
           logger.warn({
-            msg: 'Nuvemshop rate limit (429), retentando',
+            msg: 'EcommerceAPI rate limit (429), retentando',
             endpoint,
             delay,
             attempt,
@@ -118,17 +118,17 @@ class NuvemshopClient {
         if (response.status >= 500) {
           if (attempt >= this.maxRetries) {
             logger.error({
-              msg: 'Nuvemshop servidor erro máximo atingido',
+              msg: 'EcommerceAPI servidor erro máximo atingido',
               endpoint,
               status: response.status,
               ...this.ctx,
             });
-            throw new Error(`Nuvemshop: erro servidor ${response.status} após múltiplas tentativas`);
+            throw new Error(`EcommerceAPI: erro servidor ${response.status} após múltiplas tentativas`);
           }
 
           const delay = this._computeDelay(attempt);
           logger.warn({
-            msg: 'Nuvemshop servidor erro (5xx), retentando',
+            msg: 'EcommerceAPI servidor erro (5xx), retentando',
             endpoint,
             status: response.status,
             delay,
@@ -144,14 +144,14 @@ class NuvemshopClient {
         if (response.status >= 400 && response.status < 500) {
           const errorBody = await response.text();
           logger.error({
-            msg: 'Nuvemshop erro cliente (4xx)',
+            msg: 'EcommerceAPI erro cliente (4xx)',
             endpoint,
             status: response.status,
             error: errorBody,
             ...this.ctx,
           });
 
-          const clientErr = new Error(`Nuvemshop: ${response.status} - ${errorBody.substring(0, 200)}`);
+          const clientErr = new Error(`EcommerceAPI: ${response.status} - ${errorBody.substring(0, 200)}`);
           clientErr.statusCode = response.status;
           clientErr.isClientError = true;
           throw clientErr;
@@ -161,7 +161,7 @@ class NuvemshopClient {
         const responseBody = response.status === 204 ? null : await response.json();
 
         logger.debug({
-          msg: 'Nuvemshop API sucesso',
+          msg: 'EcommerceAPI API sucesso',
           endpoint,
           status: response.status,
           rateLimitRemaining,
@@ -186,7 +186,7 @@ class NuvemshopClient {
         if (attempt < this.maxRetries) {
           const delay = this._computeDelay(attempt);
           logger.warn({
-            msg: 'Nuvemshop erro rede, retentando',
+            msg: 'EcommerceAPI erro rede, retentando',
             error: err.message,
             delay,
             attempt,
@@ -201,13 +201,13 @@ class NuvemshopClient {
 
     // Esgotou tentativas
     logger.error({
-      msg: 'Nuvemshop máximo de tentativas atingido',
+      msg: 'EcommerceAPI máximo de tentativas atingido',
       endpoint,
       error: lastError.message,
       ...this.ctx,
     });
 
-    throw lastError || new Error('Nuvemshop: erro desconhecido');
+    throw lastError || new Error('EcommerceAPI: erro desconhecido');
   }
 
   /**
@@ -313,7 +313,7 @@ class NuvemshopClient {
     // Contar total de variantes a atualizar
     const totalVariants = updates.reduce((sum, prod) => sum + (prod.variants?.length || 0), 0);
     if (totalVariants > 50) {
-      throw new Error('Nuvemshop: máximo 50 variantes por requisição PATCH');
+      throw new Error('EcommerceAPI: máximo 50 variantes por requisição PATCH');
     }
 
     const result = await this._request('PATCH', '/products/stock-price', updates);
@@ -352,4 +352,4 @@ class NuvemshopClient {
   }
 }
 
-module.exports = NuvemshopClient;
+module.exports = EcommerceClient;

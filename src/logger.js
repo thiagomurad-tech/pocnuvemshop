@@ -63,7 +63,7 @@ if (process.env.LOKI_HOST) {
       new LokiTransport({
         host:     process.env.LOKI_HOST,        // ex: http://localhost:3100
         labels:   {
-          service: 'pco-nuvemshop',
+          service: 'ecommerce-webhook-middleware',
           env:     process.env.NODE_ENV || 'development',
         },
         format:           lokiFormat,
@@ -82,7 +82,7 @@ if (process.env.LOKI_HOST) {
 const logger = createLogger({
   level:       process.env.LOG_LEVEL || 'info',
   format:      sharedFormat,             // flatten roda antes de todos os transports
-  defaultMeta: { service: 'pco-nuvemshop' },
+  defaultMeta: { service: 'ecommerce-webhook-middleware' },
   transports:  loggerTransports,
 });
 

@@ -148,7 +148,7 @@ Retorna 400 (campo obrigatório).
 | Campo | Tipo | Descrição | Exemplo |
 |-------|------|-----------|---------|
 | `sku_code` | string | SKU do produto | `"TSHIRT-XL"` |
-| `product_id` | string | ID do produto Nuvemshop | `"prod-123"` |
+| `product_id` | string | ID do produto na EcommerceAPI | `"prod-123"` |
 | `variant_id` | string | ID da variante | `"var-456"` |
 | `stock` | number | Quantidade em estoque | `100` |
 

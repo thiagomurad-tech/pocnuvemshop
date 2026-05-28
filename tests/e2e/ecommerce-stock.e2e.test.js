@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * Testes E2E — Integração real com a API Nuvemshop
+ * Testes E2E — Integração real com a EcommerceAPI
  *
  * Pré-requisitos:
- *   - NUVEMSHOP_TESTING_REAL=true
- *   - NUVEMSHOP_STORE_ID e NUVEMSHOP_ACCESS_TOKEN definidos no .env
+ *   - E2E_TESTING_REAL=true
+ *   - STORE_ID e ACCESS_TOKEN definidos no .env
  *   - Redis disponível (REDIS_HOST / REDIS_PORT)
  *
  * Execução:
@@ -18,57 +18,92 @@
 
 require('dotenv').config();
 
-const NuvemshopClient          = require('../../src/nuvemshop-client');
-const { updateVariantStock }   = require('../../src/nuvemshop');
+const EcommerceClient          = require('../../src/ecommerce-client');
+const { updateVariantStock }   = require('../../src/ecommerce-api');
 const evidence                 = require('../helpers/evidence');
 
 // ── Guarda de segurança ───────────────────────────────────────────────────────
-const REAL = process.env.NUVEMSHOP_TESTING_REAL === 'true';
+const REAL = process.env.E2E_TESTING_REAL === 'true';
 
 if (!REAL) {
-  test.skip('E2E ignorado — defina NUVEMSHOP_TESTING_REAL=true para executar', () => {});
+  test.skip('E2E ignorado — defina E2E_TESTING_REAL=true para executar', () => {});
 }
 
 // ── Constantes de ambiente ────────────────────────────────────────────────────
-const STORE_ID      = process.env.NUVEMSHOP_STORE_ID;
-const ACCESS_TOKEN  = process.env.NUVEMSHOP_ACCESS_TOKEN;
-const API_BASE_URL  = process.env.NUVEMSHOP_API_BASE_URL || 'https://api.nuvemshop.com.br/2025-03';
+const STORE_ID      = process.env.STORE_ID;
+const ACCESS_TOKEN  = process.env.ACCESS_TOKEN;
+const API_BASE_URL  = process.env.API_BASE_URL || 'https://api.ecommerce.example.com/v1';
+
+// ── Produto fixo (definido em .env — nunca commitado) ─────────────────────────
+// Quando TEST_PRODUCT_ID estiver definido, o teste usa o produto existente
+// sem criar nem deletar nada. O estoque é restaurado ao valor inicial ao final.
+const FIXED_PRODUCT_ID = process.env.TEST_PRODUCT_ID;
+const FIXED_VARIANT_ID = process.env.TEST_VARIANT_ID;
+const FIXED_SKU        = process.env.TEST_SKU;
+const INITIAL_STOCK    = parseInt(process.env.TEST_INITIAL_STOCK || '10', 10);
+
+const USE_FIXED_PRODUCT = Boolean(FIXED_PRODUCT_ID && FIXED_VARIANT_ID && FIXED_SKU);
 
 // ── Estado compartilhado entre os cenários ────────────────────────────────────
 let client;
 let testProduct;   // { id, variants: [{ id, sku }] }
 
-// ── Setup: cria produto de teste ──────────────────────────────────────────────
+// ── Setup ─────────────────────────────────────────────────────────────────────
 beforeAll(async () => {
   if (!REAL) return;
 
-  client = new NuvemshopClient({ storeId: STORE_ID, accessToken: ACCESS_TOKEN });
+  client = new EcommerceClient({ storeId: STORE_ID, accessToken: ACCESS_TOKEN });
 
-  const sku = `TEST-E2E-${Date.now()}`;
-  const { product } = await client.createProduct({
-    name: { pt: `[TESTE] E2E Middleware ${Date.now()}` },
-    variants: [{ sku, price: '1.00', stock: 10 }],
-  });
-
-  testProduct = product;
-  console.log(`\n🏗  Produto de teste criado: id=${product.id} sku=${sku}`);
+  if (USE_FIXED_PRODUCT) {
+    // Produto fixo configurado em .env — reutiliza sem criar nada
+    testProduct = {
+      id:       parseInt(FIXED_PRODUCT_ID, 10),
+      variants: [{ id: parseInt(FIXED_VARIANT_ID, 10), sku: FIXED_SKU }],
+    };
+    console.log(`\n📦  Produto fixo: id=${FIXED_PRODUCT_ID} sku=${FIXED_SKU} (estoque inicial esperado: ${INITIAL_STOCK})`);
+  } else {
+    // Nenhum produto fixo configurado — cria produto temporário para o teste
+    const sku = `TEST-E2E-${Date.now()}`;
+    const { product } = await client.createProduct({
+      name:     { pt: `[TESTE] E2E Middleware ${Date.now()}` },
+      variants: [{ sku, price: '1.00', stock: INITIAL_STOCK }],
+    });
+    testProduct = product;
+    console.log(`\n🏗  Produto temporário criado: id=${product.id} sku=${sku}`);
+  }
 }, 30_000);
 
-// ── Teardown: deleta produto + salva evidência ────────────────────────────────
+// ── Teardown ──────────────────────────────────────────────────────────────────
 afterAll(async () => {
   if (!REAL) return;
 
-  if (testProduct?.id) {
+  if (USE_FIXED_PRODUCT && testProduct?.id) {
+    // Produto fixo: restaura o estoque inicial em vez de deletar
+    try {
+      await updateVariantStock({
+        storeId:     STORE_ID,
+        accessToken: ACCESS_TOKEN,
+        productId:   String(testProduct.id),
+        variantId:   String(testProduct.variants[0].id),
+        stock:       INITIAL_STOCK,
+        skuCode:     testProduct.variants[0].sku,
+      });
+      console.log(`\n♻️  Estoque restaurado para ${INITIAL_STOCK} — produto fixo preservado: id=${testProduct.id}`);
+    } catch (err) {
+      console.error(`\n⚠️  Falha ao restaurar estoque: ${err.message}`);
+    }
+  } else if (testProduct?.id) {
+    // Produto temporário: deleta ao final
     try {
       await client.deleteProduct(testProduct.id);
-      console.log(`\n🗑  Produto de teste deletado: id=${testProduct.id}`);
+      console.log(`\n🗑  Produto temporário deletado: id=${testProduct.id}`);
     } catch (err) {
       console.error(`\n⚠️  Falha ao deletar produto id=${testProduct.id}: ${err.message}`);
     }
   }
 
   const { jsonPath, htmlPath } = evidence.save({
-    store_id:    STORE_ID,
+    store_id:     STORE_ID,
     api_base_url: API_BASE_URL,
   });
 
